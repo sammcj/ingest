@@ -4,6 +4,8 @@ Ingest is a command-line tool designed to parse directories of plain text files,
 
 It's intended use case is for preparing content to be provided to AI/LLMs.
 
+![ingest screenshot](screenshot.png)
+
 ## Features
 
 - Traverse directory structures and generate a tree view
@@ -86,7 +88,8 @@ ingest -o output.md /path/to/project
 - `--print-default-excludes`: Print the default exclude patterns
 - `--print-default-template`: Print the default template
 - `--report`: Print the largest parsed files
-- `-v, --version`: Print the version number (WIP - still trying to get this to work nicely)
+- `--verbose`: Print verbose output
+- `-V, --version`: Print the version number (WIP - still trying to get this to work nicely)
 
 ## Configuration
 

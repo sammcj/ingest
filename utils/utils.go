@@ -4,12 +4,22 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"syscall"
+	"unsafe"
 
 	"github.com/atotto/clipboard"
 	"github.com/fatih/color"
 	"github.com/mitchellh/go-homedir"
 	"github.com/schollz/progressbar/v3"
 )
+
+type termSize struct {
+	Row    uint16
+	Col    uint16
+	Xpixel uint16
+	Ypixel uint16
+}
 
 func CopyToClipboard(rendered string) error {
 	err := clipboard.WriteAll(rendered)
@@ -55,9 +65,9 @@ func Label(path string) string {
 
 func PrintColouredMessage(symbol string, message string, messageColor color.Attribute) {
 	white := color.New(color.FgWhite, color.Bold).SprintFunc()
-	coloredMessage := color.New(messageColor).SprintFunc()
+	colouredMessage := color.New(messageColor).SprintFunc()
 
-	fmt.Printf("%s%s%s %s\n", white("["), white(symbol), white("]"), coloredMessage(message))
+	fmt.Printf("%s%s%s %s\n", white("["), white(symbol), white("]"), colouredMessage(message))
 }
 
 func EnsureConfigDirectories() error {
@@ -89,4 +99,36 @@ func EnsureConfigDirectories() error {
 	}
 
 	return nil
+}
+
+func FormatNumber(n int) string {
+	in := strconv.Itoa(n)
+	out := make([]byte, len(in)+(len(in)-2+int(in[0]/'0'))/3)
+	if in[0] == '-' {
+		in, out[0] = in[1:], '-'
+	}
+
+	for i, j, k := len(in)-1, len(out)-1, 0; ; i, j = i-1, j-1 {
+		out[j] = in[i]
+		if i == 0 {
+			return string(out)
+		}
+		if k++; k == 3 {
+			j, k = j-1, 0
+			out[j] = ','
+		}
+	}
+}
+
+func GetTerminalWidth() int {
+	ws := &termSize{}
+	retCode, _, _ := syscall.Syscall(syscall.SYS_IOCTL,
+			uintptr(syscall.Stdin),
+			uintptr(syscall.TIOCGWINSZ),
+			uintptr(unsafe.Pointer(ws)))
+
+	if int(retCode) == -1 {
+			return 100
+	}
+	return int(ws.Col)
 }

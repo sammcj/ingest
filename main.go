@@ -36,20 +36,16 @@ var (
 	printDefaultExcludes bool
 	printDefaultTemplate bool
 	report               bool
+	verbose              bool
 	Version              string // This will be set by the linker at build time
 )
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "ingest [path]",
+		Use:   "ingest [flags] [path]",
 		Short: "Generate a markdown LLM prompt from a codebase directory",
 		Long:  `ingest is a command-line tool to generate an LLM prompt from a codebase directory.`,
 		RunE:  run,
-	}
-
-	// if run with no arguments, assume the current directory
-	if len(os.Args) == 1 {
-		os.Args = append(os.Args, ".")
 	}
 
 	rootCmd.Flags().StringSliceP("include", "i", nil, "Patterns to include")
@@ -71,15 +67,22 @@ func main() {
 	rootCmd.Flags().StringVar(&patternExclude, "pattern-exclude", "", "Path to a specific .glob file for exclude patterns")
 	rootCmd.Flags().BoolVar(&printDefaultExcludes, "print-default-excludes", false, "Print the default exclude patterns")
 	rootCmd.Flags().BoolVar(&printDefaultTemplate, "print-default-template", false, "Print the default template")
-	rootCmd.Flags().BoolP("version", "v", false, "Print the version number")
+	rootCmd.Flags().BoolP("version", "V", false, "Print the version number")
 	rootCmd.Flags().BoolVar(&report, "report", false, "Report the top 5 largest files included in the output")
+	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+
+	rootCmd.ParseFlags(os.Args[1:])
+
+	// if run with no arguments, assume the current directory
+	if len(rootCmd.Flags().Args()) == 0 {
+		rootCmd.SetArgs([]string{"."})
+	}
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
-
 
 func run(cmd *cobra.Command, args []string) error {
 	if version, _ := cmd.Flags().GetBool("version"); version {
@@ -119,6 +122,15 @@ func run(cmd *cobra.Command, args []string) error {
 	// Setup progress spinner
 	spinner := utils.SetupSpinner("Traversing directory and building tree...")
 	defer spinner.Finish()
+
+	// If verbose, print active excludes
+	if verbose {
+		activeExcludes, err := filesystem.ReadExcludePatterns(patternExclude)
+		if err != nil {
+			return fmt.Errorf("failed to read exclude patterns: %w", err)
+		}
+		printExcludePatterns(activeExcludes)
+	}
 
 	// Traverse directory with parallel processing
 	tree, files, err := filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock)
@@ -184,7 +196,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle output
-	if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report, files); err != nil {
+	if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, files); err != nil {
 		return fmt.Errorf("failed to handle output: %w", err)
 	}
 
@@ -196,16 +208,17 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		return len(files[i].Code) > len(files[j].Code)
 	})
 
-	fmt.Println("\nTop 5 largest files:")
+	fmt.Println("\nTop 5 largest files (by estimated token count):")
 	for i, file := range files[:min(5, len(files))] {
-		fmt.Printf("%d. %s (%d bytes)\n", i+1, file.Path, len(file.Code))
+		tokenCount := token.CountTokens(file.Code, encoding)
+		fmt.Printf("%d. %s (%s tokens)\n", i+1, file.Path, utils.FormatNumber(tokenCount))
 	}
 }
 
 func handleOutput(rendered string, countTokens bool, encoding string, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
 	if countTokens {
 		tokenCount := token.CountTokens(rendered, encoding)
-		utils.PrintColouredMessage("i", fmt.Sprintf("%d Tokens (Approximate)", tokenCount), color.FgYellow)
+		utils.PrintColouredMessage("i", fmt.Sprintf("%s Tokens (Approximate)", utils.FormatNumber(tokenCount)), color.FgYellow)
 	}
 
 	if report {
@@ -247,4 +260,55 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 	}
 
 	return nil
+}
+
+
+func printExcludePatterns(patterns []string) {
+	utils.PrintColouredMessage("i", "Active exclude patterns:", color.FgCyan)
+
+	// Define colours for syntax highlighting
+	starColour := color.New(color.FgYellow).SprintFunc()
+	slashColour := color.New(color.FgGreen).SprintFunc()
+	dotColour := color.New(color.FgBlue).SprintFunc()
+
+	// Calculate the maximum width of patterns for alignment
+	maxWidth := 0
+	for _, pattern := range patterns {
+		if len(pattern) > maxWidth {
+			maxWidth = len(pattern)
+		}
+	}
+
+	// Print patterns in a horizontal list
+	lineWidth := 0
+
+	// get the width of the terminal
+	w := utils.GetTerminalWidth()
+
+	for i, pattern := range patterns {
+		highlighted := pattern
+		highlighted = strings.ReplaceAll(highlighted, "*", starColour("*"))
+		highlighted = strings.ReplaceAll(highlighted, "/", slashColour("/"))
+		highlighted = strings.ReplaceAll(highlighted, ".", dotColour("."))
+
+		// Add padding to align patterns
+		padding := strings.Repeat(" ", maxWidth - len(pattern) + 2)
+
+		if lineWidth + len(pattern) + 2 > w && i > 0 {
+			fmt.Println()
+			lineWidth = 0
+		}
+
+		if lineWidth == 0 {
+			fmt.Print("  ")
+		}
+
+		fmt.Print(highlighted + padding)
+		lineWidth += len(pattern) + len(padding)
+
+		if i < len(patterns)-1 {
+			fmt.Print("| ")
+			lineWidth += 2
+		}
+	}
 }
