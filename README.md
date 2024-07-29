@@ -9,7 +9,7 @@ It's intended use case is for preparing content to be provided to AI/LLMs.
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
 - Generate git diffs and logs
-- Count tokens for LLM compatibility
+- Count approximate tokens for LLM compatibility
 - Customisable output templates
 - Copy output to clipboard (when available)
 - Export to file or print to console
@@ -42,7 +42,7 @@ ingest will default the current working directory, if no path is provided, e.g:
 ```shell
 $ ingest
 
-⠋ Traversing directory and building tree...  [0s] [i] Token count: 9518, Model info: ChatGPT models, text-embedding-ada-002
+⠋ Traversing directory and building tree...  [0s] [i] 9741 Tokens (Approximate)
 [✓] Copied to clipboard successfully.
 ```
 

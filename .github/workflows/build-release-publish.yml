@@ -116,5 +116,11 @@ jobs:
           ls -ltaRh build/
           git config user.name github-actions
           git config user.email github-actions@github.com
+
+          # Push the tag to the repository
+          git tag -f ${{ needs.build.outputs.version }}
+          git push origin ${{ needs.build.outputs.version }} --force
+
+          # Push the latest tag to the repository
           git tag -f latest
           git push origin latest --force
