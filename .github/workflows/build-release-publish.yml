@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   build:
+    if: ! contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')
     name: Build
     runs-on: ubuntu-latest
     strategy:
@@ -33,8 +34,8 @@ jobs:
             arch: arm64
 
     outputs:
-      version: ${{ steps.set_version.outputs.version }}
-      previous_version: ${{ steps.set_version.outputs.previous-version }}
+      version: ${{ steps.set_version.outputs.new_tag }}
+      changelog: ${{ steps.set_version.outputs.changelog }}
 
     steps:
       - name: Checkout code
@@ -47,18 +48,12 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: get full version
-        id: get_version
-        uses: codacy/git-version@2.8.0
-
-      # git-version will output something like 0.0.1-main.14.fb04970, we just want the version (e.g. 0.0.1)
-      - name: Set version
+      - name: Get version
         id: set_version
-        run: |
-          full_version=${{ steps.get_version.outputs.version }}
-          version=$(echo $full_version | cut -d'-' -f1)
-          echo "version=$version" >> $GITHUB_ENV
-          echo "version=$version" >> $GITHUB_OUTPUT
+        uses: mathieudutour/github-tag-action@a22cf08638b34d5badda920f9daf6e72c477b07b # v6.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          dry_run: true
 
       - name: Get dependencies
         run: go mod download
@@ -70,7 +65,7 @@ jobs:
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
-          VERSION: ${{ steps.set_version.outputs.version }}
+          VERSION: ${{ steps.set_version.outputs.new_tag }}
 
         run: |
           go build -v -ldflags "-X main.Version=$version" -o build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }} .
@@ -87,7 +82,7 @@ jobs:
   release:
     name: Release
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -100,27 +95,20 @@ jobs:
         with:
           path: build/
 
-      - name: Create Release
-        id: create_release
-        uses: ncipollo/release-action@v1
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5 # v1
+        if: ${{ startsWith(github.ref, 'refs/heads/main') && !contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]') }}
         with:
+          tag: ${{ needs.build.outputs.version }}
+          name: ${{ needs.build.outputs.version }}
+          body: ${{ needs.build.outputs.changelog }}
+          skipIfReleaseExists: true
+          generateReleaseNotes: true
+          allowUpdates: true
+          makeLatest: ${{ startsWith(github.ref, 'refs/heads/main') && !contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]') }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/heads/main') }}
+          artifactErrorsFailBuild: true
           artifacts: |
             build/${{ env.BINARY_NAME }}*/${{ env.BINARY_NAME }}*
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ needs.build.outputs.version }}
-          makeLatest: true
-          allowUpdates: true
-
-      - name: Update latest tag
-        run: |
-          ls -ltaRh build/
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-
-          # Push the tag to the repository
-          git tag -f ${{ needs.build.outputs.version }}
-          git push origin ${{ needs.build.outputs.version }} --force
-
-          # Push the latest tag to the repository
-          git tag -f latest
-          git push origin latest --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
