@@ -18,18 +18,18 @@ It's intended use case is for preparing content to be provided to AI/LLMs.
 
 ## Installation
 
-### Manual install
-
-1. Download the latest release from the [releases page](https://github.com/sammcj/ingest/releases)
-2. Move the binary to a directory in your PATH, e.g. `mv ingest* /usr/local/bin/ingest`
-
-### go install
+### go install (recommended)
 
 Make sure you have Go installed on your system, then run:
 
 ```shell
 go install github.com/sammcj/ingest@HEAD
 ```
+
+### Manual install
+
+1. Download the latest release from the [releases page](https://github.com/sammcj/ingest/releases)
+2. Move the binary to a directory in your PATH, e.g. `mv ingest* /usr/local/bin/ingest`
 
 ## Usage
 
