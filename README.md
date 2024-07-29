@@ -104,9 +104,16 @@ You can make Ollama processing run without prompting setting `"ollama_auto_run":
 
 The config file also contains:
 
-- "ollama_model": The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
-- "ollama_prompt_prefix": An optional prefix to prepend to the prompt, e.g. "This is my application."
-- "ollama_prompt_suffix": An optional suffix to append to the prompt, e.g. "explain this code"
+- `ollama_model`: The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
+- `ollama_prompt_prefix`: An optional prefix to prepend to the prompt, e.g. "This is my application."
+- `ollama_prompt_suffix`: An optional suffix to append to the prompt, e.g. "explain this code"
+
+Ingest uses the following directories for user-specific configuration:
+
+- `~/.config/ingest/patterns/exclude`: Add .glob files here to exclude additional patterns.
+- `~/.config/ingest/patterns/templates`: Add custom .tmpl files here for different output formats.
+
+These directories will be created automatically on first run, along with README files explaining their purpose.
 
 ### Flags
 
@@ -133,15 +140,6 @@ The config file also contains:
 - `--report`: Print the largest parsed files
 - `--verbose`: Print verbose output
 - `-V, --version`: Print the version number (WIP - still trying to get this to work nicely)
-
-## Configuration
-
-Ingest uses the following directories for user-specific configuration:
-
-- `~/.config/ingest/patterns/exclude`: Add .glob files here to exclude additional patterns.
-- `~/.config/ingest/patterns/templates`: Add custom .tmpl files here for different output formats.
-
-These directories will be created automatically on first run, along with README files explaining their purpose.
 
 ### Excludes
 
