@@ -10,7 +10,8 @@ It's intended use case is for preparing content to be provided to AI/LLMs.
 
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
-- Generate git diffs and logs
+- Parse output directly to Ollama for processing
+- Generate and include git diffs and logs
 - Count approximate tokens for LLM compatibility
 - Customisable output templates
 - Copy output to clipboard (when available)
@@ -37,7 +38,7 @@ go install github.com/sammcj/ingest@HEAD
 Basic usage:
 
 ```shell
-ingest [flags] <path>
+ingest [flags] <paths>
 ```
 
 ingest will default the current working directory, if no path is provided, e.g:
@@ -61,11 +62,51 @@ Generate a prompt with git diff and copy to clipboard:
 ingest -d /path/to/project
 ```
 
+Generate a prompt for multiple files/directories:
+
+```shell
+ingest /path/to/project /path/to/other/project
+```
+
 Generate a prompt and save to a file:
 
 ```shell
 ingest -o output.md /path/to/project
 ```
+
+## Ollama Integration
+
+Ingest can pass the generated prompt to [Ollama](https://ollama.com) for processing.
+
+![ingest ollama](ollama-ingest.png)
+
+```shell
+ingest --ollama /path/to/project
+```
+
+By default this will ask you to enter a prompt:
+
+```shell
+./ingest utils.go --ollama
+⠋ Traversing directory and building tree...  [0s]
+[!] Enter Ollama prompt:
+explain this code
+This is Go code for a file named `utils.go`. It contains various utility functions for
+handling terminal output, clipboard operations, and configuration directories.
+...
+```
+
+## Configuration
+
+Ingest uses a configuration file located at `~/.config/ingest/config.json`.
+
+You can make Ollama processing run without prompting setting `"ollama_auto_run": true` in the config file.
+
+The config file also contains:
+
+- "ollama_model": The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
+- "ollama_prompt_prefix": An optional prefix to prepend to the prompt, e.g. "This is my application."
+- "ollama_prompt_suffix": An optional suffix to append to the prompt, e.g. "explain this code"
 
 ### Flags
 
@@ -76,6 +117,7 @@ ingest -o output.md /path/to/project
 - `--tokens`: Display the token count of the generated prompt
 - `-c, --encoding`: Optional tokeniser to use for token count
 - `-o, --output`: Optional output file path
+- `--ollama`: Send the generated prompt to Ollama for processing
 - `-d, --diff`: Include git diff
 - `--git-diff-branch`: Generate git diff between two branches
 - `--git-log-branch`: Retrieve git log between two branches

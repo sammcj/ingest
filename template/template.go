@@ -59,13 +59,9 @@ func getDefaultTemplate() (string, error) {
 
 func readEmbeddedTemplate() (string, error) {
 	return `
-Project Path: {{.absolute_code_path}}
+Source Trees:
 
-Source Tree:
-
-` + "```" + `
-{{.source_tree}}
-` + "```" + `
+{{.source_trees}}
 
 {{range .files}}
 {{if .Code}}

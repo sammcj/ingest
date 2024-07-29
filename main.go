@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/sammcj/ingest/config"
 	"github.com/sammcj/ingest/filesystem"
 	"github.com/sammcj/ingest/git"
 	"github.com/sammcj/ingest/template"
@@ -42,9 +45,9 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "ingest [flags] [path]",
-		Short: "Generate a markdown LLM prompt from a codebase directory",
-		Long:  `ingest is a command-line tool to generate an LLM prompt from a codebase directory.`,
+		Use:   "ingest [flags] [paths...]",
+		Short: "Generate a markdown LLM prompt from files and directories",
+		Long:  `ingest is a command-line tool to generate an LLM prompt from files and directories.`,
 		RunE:  run,
 	}
 
@@ -65,6 +68,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
 	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Print output as JSON")
 	rootCmd.Flags().StringVar(&patternExclude, "pattern-exclude", "", "Path to a specific .glob file for exclude patterns")
+	rootCmd.Flags().BoolP("ollama", "p", false, "Pass output to Ollama for processing")
 	rootCmd.Flags().BoolVar(&printDefaultExcludes, "print-default-excludes", false, "Print the default exclude patterns")
 	rootCmd.Flags().BoolVar(&printDefaultTemplate, "print-default-template", false, "Print the default template")
 	rootCmd.Flags().BoolP("version", "V", false, "Print the version number")
@@ -90,8 +94,18 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
 	if err := utils.EnsureConfigDirectories(); err != nil {
 		return fmt.Errorf("failed to ensure config directories: %w", err)
+	}
+
+	paths := args
+	if len(paths) == 0 {
+		paths = []string{"."}
 	}
 
 	if printDefaultExcludes {
@@ -132,11 +146,24 @@ func run(cmd *cobra.Command, args []string) error {
 		printExcludePatterns(activeExcludes)
 	}
 
-	// Traverse directory with parallel processing
-	tree, files, err := filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock)
-	if err != nil {
-		spinner.Finish()
-		return fmt.Errorf("failed to build directory tree: %w", err)
+	// Process all provided paths
+	var allFiles []filesystem.FileInfo
+	var allTrees []string
+
+	for _, path := range paths {
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+		}
+
+		// Traverse directory with parallel processing
+		tree, files, err := filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock)
+		if err != nil {
+			return fmt.Errorf("failed to process %s: %w", path, err)
+		}
+
+		allFiles = append(allFiles, files...)
+		allTrees = append(allTrees, fmt.Sprintf("%s:\n%s", absPath, tree))
 	}
 
 	// Handle git operations
@@ -181,9 +208,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Prepare data for template
 	data := map[string]interface{}{
+		"source_trees":       strings.Join(allTrees, "\n\n"),
+		"files":              allFiles,
 		"absolute_code_path": absPath,
-		"source_tree":        tree,
-		"files":              files,
 		"git_diff":           gitDiff,
 		"git_diff_branch":    gitDiffBranchContent,
 		"git_log_branch":     gitLogBranchContent,
@@ -192,12 +219,19 @@ func run(cmd *cobra.Command, args []string) error {
 	// Render template
 	rendered, err := template.RenderTemplate(tmpl, data)
 	if err != nil {
-		return fmt.Errorf("failed to render template: %w", err)
+			return fmt.Errorf("failed to render template: %w", err)
 	}
 
+	useOllama, _ := cmd.Flags().GetBool("ollama")
 	// Handle output
-	if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, files); err != nil {
-		return fmt.Errorf("failed to handle output: %w", err)
+	if useOllama {
+			if err := handleOllamaOutput(rendered, cfg.Ollama[0]); err != nil {
+					return fmt.Errorf("failed to handle Ollama output: %w", err)
+			}
+	} else {
+			if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, allFiles); err != nil {
+					return fmt.Errorf("failed to handle output: %w", err)
+			}
 	}
 
 	return nil
@@ -262,7 +296,6 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 	return nil
 }
 
-
 func printExcludePatterns(patterns []string) {
 	utils.PrintColouredMessage("i", "Active exclude patterns:", color.FgCyan)
 
@@ -292,9 +325,9 @@ func printExcludePatterns(patterns []string) {
 		highlighted = strings.ReplaceAll(highlighted, ".", dotColour("."))
 
 		// Add padding to align patterns
-		padding := strings.Repeat(" ", maxWidth - len(pattern) + 2)
+		padding := strings.Repeat(" ", maxWidth-len(pattern)+2)
 
-		if lineWidth + len(pattern) + 2 > w && i > 0 {
+		if lineWidth+len(pattern)+2 > w && i > 0 {
 			fmt.Println()
 			lineWidth = 0
 		}
@@ -311,4 +344,34 @@ func printExcludePatterns(patterns []string) {
 			lineWidth += 2
 		}
 	}
+}
+
+func handleOllamaOutput(rendered string, ollamaConfig config.OllamaConfig) error {
+	if ollamaConfig.PromptPrefix != "" {
+		rendered = ollamaConfig.PromptPrefix + "\n" + rendered
+	}
+	if ollamaConfig.PromptSuffix != "" {
+		rendered += ollamaConfig.PromptSuffix
+	}
+
+	if ollamaConfig.AutoRun {
+		return runOllamaCommand(ollamaConfig.Model, rendered)
+	}
+
+	fmt.Println()
+	utils.PrintColouredMessage("!", "Enter Ollama prompt:", color.FgRed)
+	reader := bufio.NewReader(os.Stdin)
+	prompt, _ := reader.ReadString('\n')
+	prompt = strings.TrimSpace(prompt)
+
+	return runOllamaCommand(ollamaConfig.Model, rendered+"\n"+prompt)
+}
+
+func runOllamaCommand(model, input string) error {
+	cmd := exec.Command("ollama", "run", model)
+	cmd.Stdin = strings.NewReader(input)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }

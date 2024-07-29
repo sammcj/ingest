@@ -134,37 +134,62 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 		return "", nil, fmt.Errorf("failed to read .gitignore: %w", err)
 	}
 
-	// Generate the tree representation
-	treeString, err := generateTreeString(rootPath, allExcludePatterns)
+	// Check if rootPath is a file or directory
+	fileInfo, err := os.Stat(rootPath)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to generate directory tree: %w", err)
+		return "", nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	// Process files
-	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	var treeString string
 
-		relPath, err := filepath.Rel(rootPath, path)
-		if err != nil {
-			return err
-		}
-
-		if shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) && !info.IsDir() {
+	if !fileInfo.IsDir() {
+		// Handle single file
+		relPath := filepath.Base(rootPath)
+		if shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) {
 			wg.Add(1)
-			go func(path, relPath string, info os.FileInfo) {
+			go func() {
 				defer wg.Done()
-				processFile(path, relPath, rootPath, lineNumber, relativePaths, noCodeblock, &mu, &files)
-			}(path, relPath, info)
+				processFile(rootPath, relPath, filepath.Dir(rootPath), lineNumber, relativePaths, noCodeblock, &mu, &files)
+			}()
+		}
+		treeString = fmt.Sprintf("File: %s", rootPath)
+	} else {
+		// Generate the tree representation for directory
+		treeString, err = generateTreeString(rootPath, allExcludePatterns)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to generate directory tree: %w", err)
 		}
 
-		return nil
-	})
+		// Process files in directory
+		err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			relPath, err := filepath.Rel(rootPath, path)
+			if err != nil {
+				return err
+			}
+
+			if shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) && !info.IsDir() {
+				wg.Add(1)
+				go func(path, relPath string, info os.FileInfo) {
+					defer wg.Done()
+					processFile(path, relPath, rootPath, lineNumber, relativePaths, noCodeblock, &mu, &files)
+				}(path, relPath, info)
+			}
+
+			return nil
+		})
+	}
 
 	wg.Wait()
 
-	return treeString, files, err
+	if err != nil {
+		return "", nil, err
+	}
+
+	return treeString, files, nil
 }
 
 func shouldIncludeFile(path string, includePatterns, excludePatterns []string, gitignore *ignore.GitIgnore, includePriority bool) bool {
