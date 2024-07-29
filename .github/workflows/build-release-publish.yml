@@ -1,0 +1,120 @@
+name: Build, Release, and Publish
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+
+env:
+  GO_VERSION: '1.22'
+  BINARY_NAME: 'ingest'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: darwin
+            arch: arm64
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+      previous_version: ${{ steps.set_version.outputs.previous-version }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go and cache dependencies
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: get full version
+        id: get_version
+        uses: codacy/git-version@2.8.0
+
+      # git-version will output something like 0.0.1-main.14.fb04970, we just want the version (e.g. 0.0.1)
+      - name: Set version
+        id: set_version
+        run: |
+          full_version=${{ steps.get_version.outputs.version }}
+          version=$(echo $full_version | cut -d'-' -f1)
+          echo "version=$version" >> $GITHUB_ENV
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Get dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          VERSION: ${{ steps.set_version.outputs.version }}
+
+        run: |
+          go build -v -ldflags "-X main.Version=$version" -o build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }} .
+          ls -ltarh build/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          retention-days: 90
+
+  release:
+    name: Release
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: build/
+
+      - name: Create Release
+        id: create_release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: |
+            build/${{ env.BINARY_NAME }}*/${{ env.BINARY_NAME }}*
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ needs.build.outputs.version }}
+          makeLatest: true
+          allowUpdates: true
+
+      - name: Update latest tag
+        run: |
+          ls -ltaRh build/
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git tag -f latest
+          git push origin latest --force
