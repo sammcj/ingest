@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   build:
-    if: ! contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')
+    if: ${{ ! contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')}}
     name: Build
     runs-on: ubuntu-latest
     strategy:
@@ -82,7 +82,7 @@ jobs:
   release:
     name: Release
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')
+    if: ${{github.event_name == 'push' && github.ref == 'refs/heads/main' && !contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')}}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
