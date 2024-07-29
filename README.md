@@ -15,6 +15,7 @@ It's intended use case is for preparing content to be provided to AI/LLMs.
 - Customisable output templates
 - Copy output to clipboard (when available)
 - Export to file or print to console
+- Optional JSON output
 
 ## Installation
 
