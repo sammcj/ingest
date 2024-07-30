@@ -126,7 +126,8 @@ These directories will be created automatically on first run, along with README 
 - `--tokens`: Display the token count of the generated prompt
 - `-c, --encoding`: Optional tokeniser to use for token count
 - `-o, --output`: Optional output file path
-- `--ollama`: Send the generated prompt to Ollama for processing
+- `--llm`: Send the generated prompt to an OpenAI compatible LLM server (such as Ollama) for processing
+- `-p, --prompt`: Optional prompt suffix to append to the generated prompt
 - `-d, --diff`: Include git diff
 - `--git-diff-branch`: Generate git diff between two branches
 - `--git-log-branch`: Retrieve git log between two branches
