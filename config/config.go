@@ -10,18 +10,16 @@ import (
 )
 
 type OllamaConfig struct {
-	Model        string `json:"ollama_model"`
-	PromptPrefix string `json:"ollama_prompt_prefix"`
-	PromptSuffix string `json:"ollama_prompt_suffix"`
-	AutoRun      bool   `json:"ollama_auto_run"`
+	Model        string `json:"llm_model"`
+	PromptPrefix string `json:"llm_prompt_prefix"`
+	PromptSuffix string `json:"llm_prompt_suffix"`
+	AutoRun      bool   `json:"llm_auto_run"`
 }
-
 
 type Config struct {
 	Ollama []OllamaConfig `json:"ollama"`
 	LLM    LLMConfig      `json:"llm"`
 }
-
 
 type LLMConfig struct {
 	AuthToken        string   `json:"llm_auth_token"`
@@ -34,7 +32,6 @@ type LLMConfig struct {
 	FrequencyPenalty *float32 `json:"llm_frequency_penalty,omitempty"`
 	APIType          string   `json:"llm_api_type"`
 }
-
 
 func LoadConfig() (*Config, error) {
 	home, err := homedir.Dir()
@@ -59,19 +56,19 @@ func LoadConfig() (*Config, error) {
 
 	// Set default values for LLM config
 	if config.LLM.AuthToken == "" {
-			config.LLM.AuthToken = os.Getenv("OPENAI_API_KEY")
+		config.LLM.AuthToken = os.Getenv("OPENAI_API_KEY")
 	}
 	if config.LLM.BaseURL == "" {
-			config.LLM.BaseURL = getDefaultBaseURL()
+		config.LLM.BaseURL = getDefaultBaseURL()
 	}
 	if config.LLM.Model == "" {
-			config.LLM.Model = "llama3.1:8b-instruct-q6_K"
+		config.LLM.Model = "llama3.1:8b-instruct-q6_K"
 	}
 	if config.LLM.MaxTokens == 0 {
-			config.LLM.MaxTokens = 2048
+		config.LLM.MaxTokens = 2048
 	}
 	if config.LLM.APIType == "" {
-    config.LLM.APIType = "OPEN_AI"
+		config.LLM.APIType = "OPEN_AI"
 	}
 
 	return &config, nil
@@ -111,13 +108,12 @@ func createDefaultConfig(configPath string) (*Config, error) {
 	return &defaultConfig, nil
 }
 
-
 func getDefaultBaseURL() string {
 	if url := os.Getenv("OPENAI_API_BASE"); url != "" {
-			return url
+		return url
 	}
-	if url := os.Getenv("OLLAMA_HOST"); url != "" {
-			return url + "/v1"
+	if url := os.Getenv("llm_HOST"); url != "" {
+		return url + "/v1"
 	}
 	return "http://localhost:11434/v1"
 }

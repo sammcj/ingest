@@ -1,10 +1,10 @@
 # Ingest
 
-Ingest is a command-line tool designed to parse directories of plain text files, such as source code, into a single markdown file.
+Ingest is a tool I've written to make my life easier when preparing content for LLMs.
 
-It's intended use case is for preparing content to be provided to AI/LLMs.
+It parses directories of plain text files, such as source code, into a single markdown file suitable for ingestion by AI/LLMs.
 
-![ingest with --llm](ingest-llm.png)
+![ingest with --llm](screenshot.png)
 
 ## Features
 
@@ -102,7 +102,7 @@ ingest --llm -p "explain this code" /path/to/project
 
 Ingest uses a configuration file located at `~/.config/ingest/config.json`.
 
-You can make Ollama processing run without prompting setting `"ollama_auto_run": true` in the config file.
+You can make Ollama processing run without prompting setting `"llm_auto_run": true` in the config file.
 
 The config file also contains:
 
