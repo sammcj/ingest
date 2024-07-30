@@ -1,15 +1,18 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/fatih/color"
 	"github.com/sammcj/ingest/config"
 	"github.com/sammcj/ingest/filesystem"
@@ -17,6 +20,7 @@ import (
 	"github.com/sammcj/ingest/template"
 	"github.com/sammcj/ingest/token"
 	"github.com/sammcj/ingest/utils"
+	openai "github.com/sashabaranov/go-openai"
 	"github.com/spf13/cobra"
 )
 
@@ -38,6 +42,8 @@ var (
 	patternExclude       string
 	printDefaultExcludes bool
 	printDefaultTemplate bool
+	promptPrefix         string
+	promptSuffix         string
 	report               bool
 	verbose              bool
 	Version              string // This will be set by the linker at build time
@@ -51,29 +57,30 @@ func main() {
 		RunE:  run,
 	}
 
-	rootCmd.Flags().StringSliceP("include", "i", nil, "Patterns to include")
-	rootCmd.Flags().StringSliceP("exclude", "e", nil, "Patterns to exclude")
-	rootCmd.Flags().BoolVar(&includePriority, "include-priority", false, "Include files in case of conflict between include and exclude patterns")
+	rootCmd.Flags().Bool("llm", false, "Send output to any OpenAI compatible API for inference")
+	rootCmd.Flags().BoolP("version", "V", false, "Print the version number")
 	rootCmd.Flags().BoolVar(&excludeFromTree, "exclude-from-tree", false, "Exclude files/folders from the source tree based on exclude patterns")
-	rootCmd.Flags().BoolVar(&tokens, "tokens", true, "Display the token count of the generated prompt")
-	rootCmd.Flags().StringVarP(&encoding, "encoding", "c", "", "Optional tokenizer to use for token count")
-	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
-	rootCmd.Flags().BoolVarP(&diff, "diff", "d", false, "Include git diff")
-	rootCmd.Flags().StringVar(&gitDiffBranch, "git-diff-branch", "", "Generate git diff between two branches")
-	rootCmd.Flags().StringVar(&gitLogBranch, "git-log-branch", "", "Retrieve git log between two branches")
-	rootCmd.Flags().BoolVarP(&lineNumber, "line-number", "l", false, "Add line numbers to the source code")
-	rootCmd.Flags().BoolVar(&noCodeblock, "no-codeblock", false, "Disable wrapping code inside markdown code blocks")
-	rootCmd.Flags().BoolVar(&relativePaths, "relative-paths", false, "Use relative paths instead of absolute paths, including the parent directory")
-	rootCmd.Flags().BoolVarP(&noClipboard, "no-clipboard", "n", false, "Disable copying to clipboard")
-	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
+	rootCmd.Flags().BoolVar(&includePriority, "include-priority", false, "Include files in case of conflict between include and exclude patterns")
 	rootCmd.Flags().BoolVar(&jsonOutput, "json", false, "Print output as JSON")
-	rootCmd.Flags().StringVar(&patternExclude, "pattern-exclude", "", "Path to a specific .glob file for exclude patterns")
-	rootCmd.Flags().BoolP("ollama", "p", false, "Pass output to Ollama for processing")
+	rootCmd.Flags().BoolVar(&noCodeblock, "no-codeblock", false, "Disable wrapping code inside markdown code blocks")
 	rootCmd.Flags().BoolVar(&printDefaultExcludes, "print-default-excludes", false, "Print the default exclude patterns")
 	rootCmd.Flags().BoolVar(&printDefaultTemplate, "print-default-template", false, "Print the default template")
-	rootCmd.Flags().BoolP("version", "V", false, "Print the version number")
-	rootCmd.Flags().BoolVar(&report, "report", false, "Report the top 5 largest files included in the output")
+	rootCmd.Flags().BoolVar(&relativePaths, "relative-paths", false, "Use relative paths instead of absolute paths, including the parent directory")
+	rootCmd.Flags().BoolVar(&report, "report", true, "Report the top 5 largest files included in the output")
+	rootCmd.Flags().BoolVar(&tokens, "tokens", true, "Display the token count of the generated prompt")
+	rootCmd.Flags().BoolVarP(&diff, "diff", "d", false, "Include git diff")
+	rootCmd.Flags().BoolVarP(&lineNumber, "line-number", "l", false, "Add line numbers to the source code")
+	rootCmd.Flags().BoolVarP(&noClipboard, "no-clipboard", "n", false, "Disable copying to clipboard")
 	rootCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output")
+	rootCmd.Flags().StringSliceP("exclude", "e", nil, "Patterns to exclude")
+	rootCmd.Flags().StringSliceP("include", "i", nil, "Patterns to include")
+	rootCmd.Flags().StringVar(&gitDiffBranch, "git-diff-branch", "", "Generate git diff between two branches")
+	rootCmd.Flags().StringVar(&gitLogBranch, "git-log-branch", "", "Retrieve git log between two branches")
+	rootCmd.Flags().StringVar(&patternExclude, "pattern-exclude", "", "Path to a specific .glob file for exclude patterns")
+	rootCmd.Flags().StringVarP(&encoding, "encoding", "c", "", "Optional tokenizer to use for token count")
+	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
+	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
+	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
 
 	rootCmd.ParseFlags(os.Args[1:])
 
@@ -107,6 +114,10 @@ func run(cmd *cobra.Command, args []string) error {
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
+
+	// Handle the prompt flag
+	promptArray, _ := cmd.Flags().GetStringArray("prompt")
+	promptSuffix = strings.Join(promptArray, " ")
 
 	if printDefaultExcludes {
 		filesystem.PrintDefaultExcludes()
@@ -219,19 +230,20 @@ func run(cmd *cobra.Command, args []string) error {
 	// Render template
 	rendered, err := template.RenderTemplate(tmpl, data)
 	if err != nil {
-			return fmt.Errorf("failed to render template: %w", err)
+		return fmt.Errorf("failed to render template: %w", err)
 	}
 
-	useOllama, _ := cmd.Flags().GetBool("ollama")
+	useLLM, _ := cmd.Flags().GetBool("llm")
+
 	// Handle output
-	if useOllama {
-			if err := handleOllamaOutput(rendered, cfg.Ollama[0]); err != nil {
-					return fmt.Errorf("failed to handle Ollama output: %w", err)
-			}
+	if useLLM {
+		if err := handleLLMOutput(rendered, cfg.LLM, tokens, encoding); err != nil {
+			return fmt.Errorf("failed to handle LLM output: %w", err)
+		}
 	} else {
-			if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, allFiles); err != nil {
-					return fmt.Errorf("failed to handle output: %w", err)
-			}
+		if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, allFiles); err != nil {
+			return fmt.Errorf("failed to handle output: %w", err)
+		}
 	}
 
 	return nil
@@ -300,7 +312,7 @@ func printExcludePatterns(patterns []string) {
 	utils.PrintColouredMessage("i", "Active exclude patterns:", color.FgCyan)
 
 	// Define colours for syntax highlighting
-	starColour := color.New(color.FgYellow).SprintFunc()
+	starColour := color.New(color.FgHiGreen).SprintFunc()
 	slashColour := color.New(color.FgGreen).SprintFunc()
 	dotColour := color.New(color.FgBlue).SprintFunc()
 
@@ -346,32 +358,133 @@ func printExcludePatterns(patterns []string) {
 	}
 }
 
-func handleOllamaOutput(rendered string, ollamaConfig config.OllamaConfig) error {
-	if ollamaConfig.PromptPrefix != "" {
-		rendered = ollamaConfig.PromptPrefix + "\n" + rendered
-	}
-	if ollamaConfig.PromptSuffix != "" {
-		rendered += ollamaConfig.PromptSuffix
+func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool, encoding string) error {
+	if countTokens {
+		tokenCount := token.CountTokens(rendered, encoding)
+		utils.PrintColouredMessage("i", fmt.Sprintf("%s Tokens (Approximate)", utils.FormatNumber(tokenCount)), color.FgYellow)
 	}
 
-	if ollamaConfig.AutoRun {
-		return runOllamaCommand(ollamaConfig.Model, rendered)
+	if promptPrefix != "" {
+		rendered = promptPrefix + "\n" + rendered
 	}
 
-	fmt.Println()
-	utils.PrintColouredMessage("!", "Enter Ollama prompt:", color.FgRed)
-	reader := bufio.NewReader(os.Stdin)
-	prompt, _ := reader.ReadString('\n')
-	prompt = strings.TrimSpace(prompt)
+	if promptSuffix != "" {
+		rendered += "\n" + promptSuffix
+	}
 
-	return runOllamaCommand(ollamaConfig.Model, rendered+"\n"+prompt)
-}
+	if llmConfig.AuthToken == "" {
+		return fmt.Errorf("LLM auth token is empty")
+	}
 
-func runOllamaCommand(model, input string) error {
-	cmd := exec.Command("ollama", "run", model)
-	cmd.Stdin = strings.NewReader(input)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	clientConfig := openai.DefaultConfig(llmConfig.AuthToken)
+	clientConfig.BaseURL = llmConfig.BaseURL
+	clientConfig.APIType = openai.APIType(llmConfig.APIType)
 
-	return cmd.Run()
+	c := openai.NewClientWithConfig(clientConfig)
+	ctx := context.Background()
+
+	req := openai.CompletionRequest{
+		Model:     llmConfig.Model,
+		MaxTokens: llmConfig.MaxTokens,
+		Prompt:    rendered,
+		Stream:    true,
+	}
+
+	if llmConfig.Temperature != nil {
+		req.Temperature = *llmConfig.Temperature
+	}
+	if llmConfig.TopP != nil {
+		req.TopP = *llmConfig.TopP
+	}
+	if llmConfig.PresencePenalty != nil {
+		req.PresencePenalty = *llmConfig.PresencePenalty
+	}
+	if llmConfig.FrequencyPenalty != nil {
+		req.FrequencyPenalty = *llmConfig.FrequencyPenalty
+	}
+
+	stream, err := c.CreateCompletionStream(ctx, req)
+	if err != nil {
+		return fmt.Errorf("LLM CompletionStream error: %w", err)
+	}
+	defer stream.Close()
+
+	termWidth := utils.GetTerminalWidth()
+	// if the term width is over 160, set it to 160
+	if termWidth > 160 {
+		termWidth = 160
+	}
+
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStandardStyle("dracula"),
+		glamour.WithWordWrap(termWidth-10),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create renderer: %w", err)
+	}
+
+	var buffer strings.Builder
+	var output strings.Builder
+	for {
+		response, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("stream error: %w", err)
+		}
+
+		buffer.WriteString(response.Choices[0].Text)
+
+		// Process complete lines
+		for {
+			line, rest, found := strings.Cut(buffer.String(), "\n")
+			if !found {
+				break
+			}
+			output.WriteString(line + "\n")
+			buffer.Reset()
+			buffer.WriteString(rest)
+
+			// Render and print if we have a complete code block or enough non-code content
+			//  if there are any headers, render the markdown chuck before each header
+			isHeading := regexp.MustCompile(`^#+`).MatchString(output.String())
+			if isHeading && output.Len() > 0 && !strings.Contains(output.String(), "```") &&
+				(strings.HasSuffix(output.String(), "```\n") || output.Len() > 200) {
+				contentToRender := strings.TrimSpace(output.String()) + "\n"
+				renderedContent, err := r.Render(contentToRender)
+				if err != nil {
+					return fmt.Errorf("rendering error: %w", err)
+				}
+				fmt.Print(renderedContent)
+				output.Reset()
+			} else {
+				if !strings.Contains(output.String(), "```") &&
+					(strings.HasSuffix(output.String(), "```\n") || output.Len() > 200) {
+					// Trim excess newlines before rendering
+					contentToRender := strings.TrimSpace(output.String()) + "\n"
+					renderedContent, err := r.Render(contentToRender)
+					if err != nil {
+						return fmt.Errorf("rendering error: %w", err)
+					}
+					fmt.Print(renderedContent)
+					output.Reset()
+				}
+			}
+		}
+	}
+
+	// Render and print any remaining content
+	if buffer.Len() > 0 {
+		output.WriteString(buffer.String())
+	}
+	if output.Len() > 0 {
+		renderedContent, err := r.Render(output.String())
+		if err != nil {
+			return fmt.Errorf("rendering error: %w", err)
+		}
+		fmt.Print(renderedContent)
+	}
+
+	return nil
 }

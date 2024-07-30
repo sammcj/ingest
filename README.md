@@ -1,16 +1,16 @@
 # Ingest
 
-Ingest is a command-line tool designed to parse directories of plain text files, such as source code, into a single markdown file.
+Ingest is a tool I've written to make my life easier when preparing content for LLMs.
 
-It's intended use case is for preparing content to be provided to AI/LLMs.
+It parses directories of plain text files, such as source code, into a single markdown file suitable for ingestion by AI/LLMs.
 
-![ingest screenshot](screenshot.png)
+![ingest with --llm](screenshot.png)
 
 ## Features
 
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
-- Parse output directly to Ollama for processing
+- Parse output directly to LLMs such as Ollama or any OpenAI compatible API for processing
 - Generate and include git diffs and logs
 - Count approximate tokens for LLM compatibility
 - Customisable output templates
@@ -74,39 +74,41 @@ Generate a prompt and save to a file:
 ingest -o output.md /path/to/project
 ```
 
-## Ollama Integration
+## LLM Integration
 
-Ingest can pass the generated prompt to [Ollama](https://ollama.com) for processing.
-
-![ingest ollama](ollama-ingest.png)
+Ingest can pass the generated prompt to LLMs that have an OpenAI compatible API such as [Ollama](https://ollama.com) for processing.
 
 ```shell
-ingest --ollama /path/to/project
+ingest --llm /path/to/project
 ```
 
-By default this will ask you to enter a prompt:
+By default this will use any prompt suffix from your configuration file:
 
 ```shell
-./ingest utils.go --ollama
+./ingest utils.go --llm
 ⠋ Traversing directory and building tree...  [0s]
-[!] Enter Ollama prompt:
-explain this code
 This is Go code for a file named `utils.go`. It contains various utility functions for
 handling terminal output, clipboard operations, and configuration directories.
 ...
+```
+
+You can provide a prompt suffix to append to the generated prompt:
+
+```shell
+ingest --llm -p "explain this code" /path/to/project
 ```
 
 ## Configuration
 
 Ingest uses a configuration file located at `~/.config/ingest/config.json`.
 
-You can make Ollama processing run without prompting setting `"ollama_auto_run": true` in the config file.
+You can make Ollama processing run without prompting setting `"llm_auto_run": true` in the config file.
 
 The config file also contains:
 
-- `ollama_model`: The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
-- `ollama_prompt_prefix`: An optional prefix to prepend to the prompt, e.g. "This is my application."
-- `ollama_prompt_suffix`: An optional suffix to append to the prompt, e.g. "explain this code"
+- `llm_model`: The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
+- `llm_prompt_prefix`: An optional prefix to prepend to the prompt, e.g. "This is my application."
+- `llm_prompt_suffix`: An optional suffix to append to the prompt, e.g. "explain this code"
 
 Ingest uses the following directories for user-specific configuration:
 

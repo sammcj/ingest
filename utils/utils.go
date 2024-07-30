@@ -123,12 +123,12 @@ func FormatNumber(n int) string {
 func GetTerminalWidth() int {
 	ws := &termSize{}
 	retCode, _, _ := syscall.Syscall(syscall.SYS_IOCTL,
-			uintptr(syscall.Stdin),
-			uintptr(syscall.TIOCGWINSZ),
-			uintptr(unsafe.Pointer(ws)))
+		uintptr(syscall.Stdin),
+		uintptr(syscall.TIOCGWINSZ),
+		uintptr(unsafe.Pointer(ws)))
 
 	if int(retCode) == -1 {
-			return 100
+		return 100
 	}
 	return int(ws.Col)
 }

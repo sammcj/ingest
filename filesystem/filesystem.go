@@ -69,7 +69,6 @@ func ReadExcludePatterns(patternExclude string) ([]string, error) {
 	return patterns, nil
 }
 
-
 func readGlobFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -267,7 +266,6 @@ func PrintDefaultExcludes() {
 	}
 	fmt.Println(strings.Join(excludes, "\n"))
 }
-
 
 func processFile(path, relPath string, rootPath string, lineNumber, relativePaths, noCodeblock bool, mu *sync.Mutex, files *[]FileInfo) {
 	// Check if the file is binary

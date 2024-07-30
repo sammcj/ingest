@@ -13,7 +13,7 @@ func GetTokenizer(encoding string) *tiktoken.Tiktoken {
 	switch encoding {
 	case "o200k", "gpt-4o":
 		tk, err = tiktoken.GetEncoding("o200k_base")
-	case "cl100k", "llama3","llama-3", "gpt-4", "gpt-3.5-turbo", "text-embedding-3-large", "text-embedding-3-small", "text-embedding-ada-002", "text-ada-002":
+	case "cl100k", "llama3", "llama-3", "gpt-4", "gpt-3.5-turbo", "text-embedding-3-large", "text-embedding-3-small", "text-embedding-ada-002", "text-ada-002":
 		tk, err = tiktoken.GetEncoding("cl100k_base")
 	case "p50k":
 		tk, err = tiktoken.GetEncoding("p50k_base")
