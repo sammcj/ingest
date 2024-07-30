@@ -10,7 +10,7 @@ It's intended use case is for preparing content to be provided to AI/LLMs.
 
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
-- Parse output directly to Ollama for processing
+- Parse output directly to LLMs for processing
 - Generate and include git diffs and logs
 - Count approximate tokens for LLM compatibility
 - Customisable output templates
@@ -74,26 +74,30 @@ Generate a prompt and save to a file:
 ingest -o output.md /path/to/project
 ```
 
-## Ollama Integration
+## LLM Integration
 
-Ingest can pass the generated prompt to [Ollama](https://ollama.com) for processing.
+Ingest can pass the generated prompt to LLMs that have an OpenAI compatible API such as [Ollama](https://ollama.com) for processing.
 
 ![ingest ollama](ollama-ingest.png)
 
 ```shell
-ingest --ollama /path/to/project
+ingest --llm /path/to/project
 ```
 
-By default this will ask you to enter a prompt:
+By default this will use any prompt suffix from your configuration file:
 
 ```shell
-./ingest utils.go --ollama
+./ingest utils.go --llm
 ⠋ Traversing directory and building tree...  [0s]
-[!] Enter Ollama prompt:
-explain this code
 This is Go code for a file named `utils.go`. It contains various utility functions for
 handling terminal output, clipboard operations, and configuration directories.
 ...
+```
+
+You can provide a prompt suffix to append to the generated prompt:
+
+```shell
+ingest --llm -p "explain this code" /path/to/project
 ```
 
 ## Configuration
