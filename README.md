@@ -106,9 +106,9 @@ You can make Ollama processing run without prompting setting `"llm_auto_run": tr
 
 The config file also contains:
 
-- `ollama_model`: The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
-- `ollama_prompt_prefix`: An optional prefix to prepend to the prompt, e.g. "This is my application."
-- `ollama_prompt_suffix`: An optional suffix to append to the prompt, e.g. "explain this code"
+- `llm_model`: The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
+- `llm_prompt_prefix`: An optional prefix to prepend to the prompt, e.g. "This is my application."
+- `llm_prompt_suffix`: An optional suffix to append to the prompt, e.g. "explain this code"
 
 Ingest uses the following directories for user-specific configuration:
 
