@@ -6,7 +6,6 @@ require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/bmatcuk/doublestar/v4 v4.6.1
 	github.com/charmbracelet/glamour v0.7.0
-	github.com/charmbracelet/x/ansi v0.1.4
 	github.com/fatih/color v1.17.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkoukk/tiktoken-go v0.1.7

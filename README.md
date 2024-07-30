@@ -4,13 +4,13 @@ Ingest is a command-line tool designed to parse directories of plain text files,
 
 It's intended use case is for preparing content to be provided to AI/LLMs.
 
-![ingest screenshot](screenshot.png)
+![ingest with --llm](ingest-llm.png)
 
 ## Features
 
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
-- Parse output directly to LLMs for processing
+- Parse output directly to LLMs such as Ollama or any OpenAI compatible API for processing
 - Generate and include git diffs and logs
 - Count approximate tokens for LLM compatibility
 - Customisable output templates
@@ -77,8 +77,6 @@ ingest -o output.md /path/to/project
 ## LLM Integration
 
 Ingest can pass the generated prompt to LLMs that have an OpenAI compatible API such as [Ollama](https://ollama.com) for processing.
-
-![ingest ollama](ollama-ingest.png)
 
 ```shell
 ingest --llm /path/to/project

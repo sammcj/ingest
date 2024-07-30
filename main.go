@@ -66,7 +66,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&printDefaultExcludes, "print-default-excludes", false, "Print the default exclude patterns")
 	rootCmd.Flags().BoolVar(&printDefaultTemplate, "print-default-template", false, "Print the default template")
 	rootCmd.Flags().BoolVar(&relativePaths, "relative-paths", false, "Use relative paths instead of absolute paths, including the parent directory")
-	rootCmd.Flags().BoolVar(&report, "report", false, "Report the top 5 largest files included in the output")
+	rootCmd.Flags().BoolVar(&report, "report", true, "Report the top 5 largest files included in the output")
 	rootCmd.Flags().BoolVar(&tokens, "tokens", true, "Display the token count of the generated prompt")
 	rootCmd.Flags().BoolVarP(&diff, "diff", "d", false, "Include git diff")
 	rootCmd.Flags().BoolVarP(&lineNumber, "line-number", "l", false, "Add line numbers to the source code")
@@ -237,7 +237,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Handle output
 	if useLLM {
-		if err := handleLLMOutput(rendered, cfg.LLM); err != nil {
+		if err := handleLLMOutput(rendered, cfg.LLM, tokens, encoding); err != nil {
 			return fmt.Errorf("failed to handle LLM output: %w", err)
 		}
 	} else {
@@ -358,7 +358,12 @@ func printExcludePatterns(patterns []string) {
 	}
 }
 
-func handleLLMOutput(rendered string, llmConfig config.LLMConfig) error {
+func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool, encoding string) error {
+	if countTokens {
+		tokenCount := token.CountTokens(rendered, encoding)
+		utils.PrintColouredMessage("i", fmt.Sprintf("%s Tokens (Approximate)", utils.FormatNumber(tokenCount)), color.FgYellow)
+	}
+
 	if promptPrefix != "" {
 		rendered = promptPrefix + "\n" + rendered
 	}
