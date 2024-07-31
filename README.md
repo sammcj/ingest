@@ -4,6 +4,10 @@ Ingest is a tool I've written to make my life easier when preparing content for 
 
 It parses directories of plain text files, such as source code, into a single markdown file suitable for ingestion by AI/LLMs.
 
+![ingest](screenshot2.png)
+
+Ingest can also pass the prompt directly to an LLM such as Ollama for processing.
+
 ![ingest with --llm](screenshot.png)
 
 ## Features
