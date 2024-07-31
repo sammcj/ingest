@@ -80,6 +80,7 @@ const defaultGlobContent = `
 **/*.ttf
 **/*.doc
 **/*.docx
+**/*.lock
 **/*.ppt
 **/*.pptx
 **/*.odf
@@ -112,10 +113,8 @@ const defaultGlobContent = `
 **/LICENSE*
 **/esbuild.config.mjs
 **/manifest.json
-**/package-lock.json
 **/version-bump.mjs
 **/versions.json
-**/yarn.lock
 **/CONTRIBUTING*
 **/CHANGELOG*
 **/SECURITY*
@@ -128,7 +127,6 @@ const defaultGlobContent = `
 **/renovate.json
 **/pre-commit-config.yaml
 **/.vimrc
-**/poetry.lock
 **/changelog.md
 **/contributing.md
 **/.pretterignore
