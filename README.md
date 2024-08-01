@@ -21,6 +21,7 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Copy output to clipboard (when available)
 - Export to file or print to console
 - Optional JSON output
+- Estimate VRAM requirements and check model compatibility using the vramestimator package
 
 ## Installation
 
@@ -45,7 +46,7 @@ Basic usage:
 ingest [flags] <paths>
 ```
 
-ingest will default the current working directory, if no path is provided, e.g:
+ingest will default to the current working directory if no path is provided, e.g:
 
 ```shell
 $ ingest
@@ -78,6 +79,49 @@ Generate a prompt and save to a file:
 ingest -o output.md /path/to/project
 ```
 
+### VRAM Estimation and Model Compatibility
+
+Ingest includes a feature to estimate VRAM requirements and check model compatibility using the [Gollama](https://github.com/sammcj/gollama)'s vramestimator package. This helps you determine if your generated content will fit within the specified model, VRAM, and quantisation constraints.
+
+To use this feature, add the following flags to your ingest command:
+
+```shell
+ingest --estimate-vram --model <model_id> --vram <vram_size> --quant <quantisation_level> [other flags] <paths>
+```
+
+For example:
+
+```shell
+ingest --estimate-vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --vram 8 --quant q4_0 /path/to/project
+```
+
+This will generate the content as usual and then check if it's compatible with the specified model, VRAM size (8 GB), and quantisation level (q4_0):
+
+```shell
+ingest --estimate-vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --vram 8 --quant q4_0 .
+⠋ Traversing directory and building tree...  [0s]
+
+[✓] The generated content fits within the specified model/VRAM/quantisation constraints.
+[i] 14,702 Tokens (Approximate)
+
+Top 5 largest files (by estimated token count):
+1. /Users/samm/git/sammcj/ingest/main.go (4,682 tokens)
+2. /Users/samm/git/sammcj/ingest/filesystem/filesystem.go (2,694 tokens)
+3. /Users/samm/git/sammcj/ingest/README.md (1,895 tokens)
+4. /Users/samm/git/sammcj/ingest/utils/utils.go (948 tokens)
+5. /Users/samm/git/sammcj/ingest/config/config.go (884 tokens)
+[✓] Copied to clipboard successfully.
+```
+
+Available flags for VRAM estimation:
+
+- `--estimate-vram`: Enable VRAM estimation and model compatibility check
+- `--model`: Specify the model ID to check against (required for estimation)
+- `--vram`: Specify the VRAM size to check against, in GB (optional)
+- `--quant`: Specify the quantisation level to check against (e.g., fp16, q8_0, q4_0)
+
+If the generated content fits within the specified constraints, you'll see a success message. Otherwise, you'll receive a warning that the content may not fit.
+
 ## LLM Integration
 
 Ingest can pass the generated prompt to LLMs that have an OpenAI compatible API such as [Ollama](https://ollama.com) for processing.
@@ -102,6 +146,13 @@ You can provide a prompt suffix to append to the generated prompt:
 ingest --llm -p "explain this code" /path/to/project
 ```
 
+## Configuration
+
+Ingest uses a configuration file located at `~/.config/ingest/config.json`.
+
+You can make Ollama processing run without prompting setting `"llm_auto_run": true` in the config file.
+
+The config file also contains
 ## Configuration
 
 Ingest uses a configuration file located at `~/.config/ingest/config.json`.

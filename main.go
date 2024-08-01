@@ -14,6 +14,7 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/fatih/color"
+	"github.com/sammcj/gollama/vramestimator"
 	"github.com/sammcj/ingest/config"
 	"github.com/sammcj/ingest/filesystem"
 	"github.com/sammcj/ingest/git"
@@ -45,6 +46,10 @@ var (
 	promptPrefix         string
 	promptSuffix         string
 	report               bool
+	useVRAMEstimator bool
+	modelID          string
+	vramSize         float64
+	quantLevel       string
 	verbose              bool
 	Version              string // This will be set by the linker at build time
 )
@@ -81,6 +86,13 @@ func main() {
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
+
+	// vRAM estimation via Gollama package
+	rootCmd.Flags().BoolVar(&useVRAMEstimator, "estimate-vram", false, "Use vramestimator to check token size compatibility")
+	rootCmd.Flags().StringVar(&modelID, "model", "", "Model ID to check against with vramestimator")
+	rootCmd.Flags().Float64Var(&vramSize, "vram", 0, "VRAM size to check against with vramestimator (in GB)")
+	rootCmd.Flags().StringVar(&quantLevel, "quant", "", "Quantisation level to check against with vramestimator")
+
 
 	rootCmd.ParseFlags(os.Args[1:])
 
@@ -228,11 +240,23 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Render template
+
 	rendered, err := template.RenderTemplate(tmpl, data)
 	if err != nil {
 		return fmt.Errorf("failed to render template: %w", err)
 	}
 
+	// Check with vramestimator if requested
+	if useVRAMEstimator {
+		compatible, err := checkWithVRAMEstimator(rendered)
+		if err != nil {
+			utils.PrintColouredMessage("!", fmt.Sprintf("Failed to check with vramestimator: %v", err), color.FgRed)
+		} else if !compatible {
+			utils.PrintColouredMessage("!", "The generated content may not fit within the specified model/VRAM/quantisation constraints.", color.FgYellow)
+		} else {
+			utils.PrintColouredMessage("✓", "The generated content fits within the specified model/VRAM/quantisation constraints.", color.FgGreen)
+		}
+	}
 	useLLM, _ := cmd.Flags().GetBool("llm")
 
 	// Handle output
@@ -487,4 +511,47 @@ func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bo
 	}
 
 	return nil
+}
+
+
+func checkWithVRAMEstimator(content string) (bool, error) {
+	if modelID == "" {
+		return false, fmt.Errorf("model ID is required for VRAM estimation")
+	}
+
+	tokenCount := token.CountTokens(content, encoding)
+
+	var kvCacheQuant vramestimator.KVCacheQuantisation
+	switch quantLevel {
+	case "fp16":
+		kvCacheQuant = vramestimator.KVCacheFP16
+	case "q8_0":
+		kvCacheQuant = vramestimator.KVCacheQ8_0
+	case "q4_0":
+		kvCacheQuant = vramestimator.KVCacheQ4_0
+	default:
+		return false, fmt.Errorf("invalid quantisation level: %s", quantLevel)
+	}
+
+	bpw, err := vramestimator.ParseBPWOrQuant(quantLevel)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse quantisation level: %w", err)
+	}
+
+	vramRequired, err := vramestimator.CalculateVRAM(modelID, bpw, tokenCount, kvCacheQuant, "")
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate VRAM: %w", err)
+	}
+
+	if vramSize > 0 {
+		return vramRequired <= vramSize, nil
+	}
+
+	// If VRAM size is not specified, we'll calculate the maximum context
+	maxContext, err := vramestimator.CalculateContext(modelID, vramSize, bpw, kvCacheQuant, "")
+	if err != nil {
+		return false, fmt.Errorf("failed to calculate maximum context: %w", err)
+	}
+
+	return tokenCount <= maxContext, nil
 }
