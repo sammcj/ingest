@@ -46,10 +46,13 @@ var (
 	promptPrefix         string
 	promptSuffix         string
 	report               bool
-	useVRAMEstimator bool
-	modelID          string
-	vramSize         float64
-	quantLevel       string
+	vramFlag      bool
+	modelIDFlag   string
+	quantFlag     string
+	contextFlag   int
+	kvCacheFlag   string
+	memoryFlag    float64
+	quantTypeFlag string
 	verbose              bool
 	Version              string // This will be set by the linker at build time
 )
@@ -87,11 +90,14 @@ func main() {
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
 
-	// vRAM estimation via Gollama package
-	rootCmd.Flags().BoolVar(&useVRAMEstimator, "estimate-vram", false, "Use vramestimator to check token size compatibility")
-	rootCmd.Flags().StringVar(&modelID, "model", "", "Model ID to check against with vramestimator")
-	rootCmd.Flags().Float64Var(&vramSize, "vram", 0, "VRAM size to check against with vramestimator (in GB)")
-	rootCmd.Flags().StringVar(&quantLevel, "quant", "", "Quantisation level to check against with vramestimator")
+	// VRAM estimation flags
+	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
+	rootCmd.Flags().StringVar(&modelIDFlag, "model", "", "vRAM Estimation - Model ID")
+	rootCmd.Flags().StringVar(&quantFlag, "quant", "", "vRAM Estimation - Quantization type (e.g., q4_k_m) or bits per weight (e.g., 5.0)")
+	rootCmd.Flags().IntVar(&contextFlag, "context", 0, "vRAM Estimation - Context length for vRAM estimation")
+	rootCmd.Flags().StringVar(&kvCacheFlag, "kvcache", "fp16", "vRAM Estimation - KV cache quantization: fp16, q8_0, or q4_0")
+	rootCmd.Flags().Float64Var(&memoryFlag, "memory", 0, "vRAM Estimation - Available memory in GB for context calculation")
+	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
 
 
 	rootCmd.ParseFlags(os.Args[1:])
@@ -246,15 +252,10 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to render template: %w", err)
 	}
 
-	// Check with vramestimator if requested
-	if useVRAMEstimator {
-		compatible, err := checkWithVRAMEstimator(rendered)
-		if err != nil {
-			utils.PrintColouredMessage("!", fmt.Sprintf("Failed to check with vramestimator: %v", err), color.FgRed)
-		} else if !compatible {
-			utils.PrintColouredMessage("!", "The generated content may not fit within the specified model/VRAM/quantisation constraints.", color.FgYellow)
-		} else {
-			utils.PrintColouredMessage("✓", "The generated content fits within the specified model/VRAM/quantisation constraints.", color.FgGreen)
+	// VRAM estimation
+	if vramFlag {
+		if err := performVRAMEstimation(rendered); err != nil {
+			fmt.Printf("Error in VRAM estimation: %v\n", err)
 		}
 	}
 	useLLM, _ := cmd.Flags().GetBool("llm")
@@ -514,15 +515,14 @@ func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bo
 }
 
 
-func checkWithVRAMEstimator(content string) (bool, error) {
-	if modelID == "" {
-		return false, fmt.Errorf("model ID is required for VRAM estimation")
+
+func performVRAMEstimation(content string) error {
+	if modelIDFlag == "" {
+		return fmt.Errorf("model ID is required for VRAM estimation")
 	}
 
-	tokenCount := token.CountTokens(content, encoding)
-
 	var kvCacheQuant vramestimator.KVCacheQuantisation
-	switch quantLevel {
+	switch kvCacheFlag {
 	case "fp16":
 		kvCacheQuant = vramestimator.KVCacheFP16
 	case "q8_0":
@@ -530,28 +530,56 @@ func checkWithVRAMEstimator(content string) (bool, error) {
 	case "q4_0":
 		kvCacheQuant = vramestimator.KVCacheQ4_0
 	default:
-		return false, fmt.Errorf("invalid quantisation level: %s", quantLevel)
+		fmt.Printf("Invalid KV cache quantization: %s. Using default fp16.\n", kvCacheFlag)
+		kvCacheQuant = vramestimator.KVCacheFP16
 	}
 
-	bpw, err := vramestimator.ParseBPWOrQuant(quantLevel)
-	if err != nil {
-		return false, fmt.Errorf("failed to parse quantisation level: %w", err)
+	tokenCount := token.CountTokens(content, encoding)
+
+	if memoryFlag > 0 && contextFlag == 0 && quantFlag == "" {
+		// Calculate best BPW
+		bestBPW, err := vramestimator.CalculateBPW(modelIDFlag, memoryFlag, 0, kvCacheQuant, quantTypeFlag, "")
+		if err != nil {
+			return fmt.Errorf("error calculating BPW: %w", err)
+		}
+		fmt.Printf("Best BPW for %.2f GB of memory: %v\n", memoryFlag, bestBPW)
+	} else {
+		// Parse the quant flag for other operations
+		bpw, err := vramestimator.ParseBPWOrQuant(quantFlag)
+		if err != nil {
+			return fmt.Errorf("error parsing quantization: %w", err)
+		}
+
+		if memoryFlag > 0 && contextFlag == 0 {
+			// Calculate maximum context
+			maxContext, err := vramestimator.CalculateContext(modelIDFlag, memoryFlag, bpw, kvCacheQuant, "")
+			if err != nil {
+				return fmt.Errorf("error calculating context: %w", err)
+			}
+			fmt.Printf("Maximum context for %.2f GB of memory: %d\n", memoryFlag, maxContext)
+			if tokenCount > maxContext {
+				fmt.Printf("Warning: Generated content (%d tokens) exceeds maximum context.\n", tokenCount)
+			} else {
+				fmt.Printf("Generated content (%d tokens) fits within maximum context.\n", tokenCount)
+			}
+		} else if contextFlag > 0 {
+			// Calculate VRAM usage
+			vram, err := vramestimator.CalculateVRAM(modelIDFlag, bpw, contextFlag, kvCacheQuant, "")
+			if err != nil {
+				return fmt.Errorf("error calculating VRAM: %w", err)
+			}
+			fmt.Printf("Estimated VRAM usage: %.2f GB\n", vram)
+			if memoryFlag > 0 {
+				if vram > memoryFlag {
+					fmt.Printf("Warning: Estimated VRAM usage (%.2f GB) exceeds available memory (%.2f GB).\n", vram, memoryFlag)
+				} else {
+					fmt.Printf("Estimated VRAM usage (%.2f GB) fits within available memory (%.2f GB).\n", vram, memoryFlag)
+				}
+			}
+		} else {
+			return fmt.Errorf("invalid combination of flags. Please specify either --memory, --context, or both")
+		}
 	}
 
-	vramRequired, err := vramestimator.CalculateVRAM(modelID, bpw, tokenCount, kvCacheQuant, "")
-	if err != nil {
-		return false, fmt.Errorf("failed to calculate VRAM: %w", err)
-	}
-
-	if vramSize > 0 {
-		return vramRequired <= vramSize, nil
-	}
-
-	// If VRAM size is not specified, we'll calculate the maximum context
-	maxContext, err := vramestimator.CalculateContext(modelID, vramSize, bpw, kvCacheQuant, "")
-	if err != nil {
-		return false, fmt.Errorf("failed to calculate maximum context: %w", err)
-	}
-
-	return tokenCount <= maxContext, nil
+	return nil
 }
