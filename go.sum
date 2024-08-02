@@ -79,6 +79,8 @@ github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 h1:OkMGxebDj
 github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06/go.mod h1:+ePHsJ1keEjQtpvf9HHw0f4ZeJ0TLRsxhunSI2hYJSs=
 github.com/sammcj/gollama v1.21.1 h1:40RLBhSNZTg3jJ014tNXFKsSeTh7tkt2CeHU+bP+6sc=
 github.com/sammcj/gollama v1.21.1/go.mod h1:1OQYKL5SvlZoN+1H6SDk6cykOPI5cXw+nEmhTFLWtrM=
+github.com/sammcj/gollama v1.23.0 h1:+QjimCYoq/IySIqs/5pvBqSJqJnkka9oL/NynGULe/k=
+github.com/sammcj/gollama v1.23.0/go.mod h1:1OQYKL5SvlZoN+1H6SDk6cykOPI5cXw+nEmhTFLWtrM=
 github.com/sashabaranov/go-openai v1.27.1 h1:7Nx6db5NXbcoutNmAUQulEQZEpHG/SkzfexP2X5RWMk=
 github.com/sashabaranov/go-openai v1.27.1/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/schollz/progressbar/v3 v3.14.4 h1:W9ZrDSJk7eqmQhd3uxFNNcTr0QL+xuGNI9dEMrw0r74=
