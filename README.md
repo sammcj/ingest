@@ -94,29 +94,29 @@ Examples:
 Estimate VRAM usage for a specific context:
 
 ```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant q4_k_m --context 2048 --kvcache q4_0
+ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant q4_k_m --context 2048 --kvcache q4_0 .
 # Estimated VRAM usage: 5.35 GB
 ```
 
 Calculate maximum context for a given memory constraint:
 
 ```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant q4_k_m --memory 6 --kvcache q8_0
+ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant q4_k_m --memory 6 --kvcache q8_0 .
 # Maximum context for 6.00 GB of memory: 5069
 ```
 
 Find the best BPW (Bits Per Weight):
 
 ```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 6 --quanttype gguf
+ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 6 --quanttype gguf .
 # Best BPW for 6.00 GB of memory: IQ3_S
 ```
 
 The tool also works for exl2 (ExllamaV2) models:
 
 ```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant 5.0 --context 2048 --kvcache q4_0 # For exl2 models
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant 5.0 --memory 6 --kvcache q8_0 # For exl2 models
+ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant 5.0 --context 2048 --kvcache q4_0 . # For exl2 models
+ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant 5.0 --memory 6 --kvcache q8_0 . # For exl2 models
 ```
 
 When using the VRAM estimation feature along with content generation, ingest will provide information about the generated content's compatibility with the specified constraints:

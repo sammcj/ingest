@@ -254,8 +254,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// VRAM estimation
 	if vramFlag {
+		fmt.Println()
 		if err := performVRAMEstimation(rendered); err != nil {
-			fmt.Printf("Error in VRAM estimation: %v\n", err)
+			utils.PrintColouredMessage("❌", fmt.Sprintf("VRAM estimation error: %v", err), color.FgRed)
 		}
 	}
 	useLLM, _ := cmd.Flags().GetBool("llm")
@@ -263,7 +264,7 @@ func run(cmd *cobra.Command, args []string) error {
 	// Handle output
 	if useLLM {
 		if err := handleLLMOutput(rendered, cfg.LLM, tokens, encoding); err != nil {
-			return fmt.Errorf("failed to handle LLM output: %w", err)
+			utils.PrintColouredMessage("❌", fmt.Sprintf("LLM output error: %v", err), color.FgRed)
 		}
 	} else {
 		if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, allFiles); err != nil {
@@ -289,7 +290,7 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 func handleOutput(rendered string, countTokens bool, encoding string, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
 	if countTokens {
 		tokenCount := token.CountTokens(rendered, encoding)
-		utils.PrintColouredMessage("i", fmt.Sprintf("%s Tokens (Approximate)", utils.FormatNumber(tokenCount)), color.FgYellow)
+		utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow)
 	}
 
 	if report {
@@ -311,11 +312,11 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 		if !noClipboard {
 			err := utils.CopyToClipboard(rendered)
 			if err == nil {
-				utils.PrintColouredMessage("✓", "Copied to clipboard successfully.", color.FgGreen)
+				utils.PrintColouredMessage("✅", "Copied to clipboard successfully.", color.FgGreen)
 				return nil
 			}
 			// If clipboard copy failed, fall back to console output
-			utils.PrintColouredMessage("!", fmt.Sprintf("Failed to copy to clipboard: %v. Falling back to console output.", err), color.FgYellow)
+			utils.PrintColouredMessage("i", fmt.Sprintf("Failed to copy to clipboard: %v. Falling back to console output.", err), color.FgYellow)
 		}
 
 		if output != "" {
@@ -323,7 +324,7 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 			if err != nil {
 				return fmt.Errorf("failed to write to file: %w", err)
 			}
-			utils.PrintColouredMessage("✓", fmt.Sprintf("Written to file: %s", output), color.FgGreen)
+			utils.PrintColouredMessage("✅", fmt.Sprintf("Written to file: %s", output), color.FgGreen)
 		} else {
 			// If no output file is specified, print to console
 			fmt.Print(rendered)
@@ -386,7 +387,7 @@ func printExcludePatterns(patterns []string) {
 func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool, encoding string) error {
 	if countTokens {
 		tokenCount := token.CountTokens(rendered, encoding)
-		utils.PrintColouredMessage("i", fmt.Sprintf("%s Tokens (Approximate)", utils.FormatNumber(tokenCount)), color.FgYellow)
+		utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow)
 	}
 
 	if promptPrefix != "" {
@@ -530,7 +531,7 @@ func performVRAMEstimation(content string) error {
 	case "q4_0":
 		kvCacheQuant = vramestimator.KVCacheQ4_0
 	default:
-		fmt.Printf("Invalid KV cache quantization: %s. Using default fp16.\n", kvCacheFlag)
+		utils.PrintColouredMessage("❌", fmt.Sprintf("Invalid KV cache quantization: %s. Using default fp16.", kvCacheFlag), color.FgYellow)
 		kvCacheQuant = vramestimator.KVCacheFP16
 	}
 
@@ -540,14 +541,22 @@ func performVRAMEstimation(content string) error {
 		// Calculate best BPW
 		bestBPW, err := vramestimator.CalculateBPW(modelIDFlag, memoryFlag, 0, kvCacheQuant, quantTypeFlag, "")
 		if err != nil {
-			return fmt.Errorf("error calculating BPW: %w", err)
+				utils.PrintColouredMessage("❌", fmt.Sprintf("Error calculating BPW: %v", err), color.FgYellow)
 		}
-		fmt.Printf("Best BPW for %.2f GB of memory: %v\n", memoryFlag, bestBPW)
+		// Check if bestBPW is a string
+		if bpwStr, ok := bestBPW.(string); ok {
+				utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Best BPW for %.2f GB of memory: %s", memoryFlag, bpwStr), color.FgGreen)
+		} else if bpwFloat, ok := bestBPW.(float64); ok {
+				utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Best BPW for %.2f GB of memory: %.2f", memoryFlag, bpwFloat), color.FgGreen)
+		} else {
+				utils.PrintColouredMessage("❌", fmt.Sprintf("Unexpected type for BPW: %T", bestBPW), color.FgYellow)
+		}
+
 	} else {
 		// Parse the quant flag for other operations
 		bpw, err := vramestimator.ParseBPWOrQuant(quantFlag)
 		if err != nil {
-			return fmt.Errorf("error parsing quantization: %w", err)
+			utils.PrintColouredMessage("❌", fmt.Sprintf("Error parsing quantization: %v", err), color.FgYellow)
 		}
 
 		if memoryFlag > 0 && contextFlag == 0 {
@@ -556,24 +565,24 @@ func performVRAMEstimation(content string) error {
 			if err != nil {
 				return fmt.Errorf("error calculating context: %w", err)
 			}
-			fmt.Printf("Maximum context for %.2f GB of memory: %d\n", memoryFlag, maxContext)
+			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Maximum context for %.2f GB of memory: %d", memoryFlag, maxContext), color.FgGreen)
 			if tokenCount > maxContext {
-				fmt.Printf("Warning: Generated content (%d tokens) exceeds maximum context.\n", tokenCount)
+				utils.PrintColouredMessage("❗️", fmt.Sprintf("Generated content (%d tokens) exceeds maximum context.", tokenCount), color.FgYellow)
 			} else {
-				fmt.Printf("Generated content (%d tokens) fits within maximum context.\n", tokenCount)
+				utils.PrintColouredMessage("✅", fmt.Sprintf("Generated content (%d tokens) fits within maximum context.", tokenCount), color.FgGreen)
 			}
 		} else if contextFlag > 0 {
 			// Calculate VRAM usage
 			vram, err := vramestimator.CalculateVRAM(modelIDFlag, bpw, contextFlag, kvCacheQuant, "")
 			if err != nil {
-				return fmt.Errorf("error calculating VRAM: %w", err)
+				utils.PrintColouredMessage("❌", fmt.Sprintf("Error calculating VRAM: %v", err), color.FgYellow)
 			}
-			fmt.Printf("Estimated VRAM usage: %.2f GB\n", vram)
+			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Estimated VRAM usage: %.2f GB", vram), color.FgGreen)
 			if memoryFlag > 0 {
 				if vram > memoryFlag {
-					fmt.Printf("Warning: Estimated VRAM usage (%.2f GB) exceeds available memory (%.2f GB).\n", vram, memoryFlag)
+					utils.PrintColouredMessage("❗️", fmt.Sprintf("Estimated VRAM usage (%.2f GB) exceeds available memory (%.2f GB).", vram, memoryFlag), color.FgYellow)
 				} else {
-					fmt.Printf("Estimated VRAM usage (%.2f GB) fits within available memory (%.2f GB).\n", vram, memoryFlag)
+					utils.PrintColouredMessage("✅", fmt.Sprintf("Estimated VRAM usage (%.2f GB) fits within available memory (%.2f GB).", vram, memoryFlag), color.FgGreen)
 				}
 			}
 		} else {
