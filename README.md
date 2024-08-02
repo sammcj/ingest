@@ -126,8 +126,8 @@ When using the VRAM estimation feature along with content generation, ingest wil
 ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 8 --quant q4_0 .
 ⠋ Traversing directory and building tree... [0s]
 [ℹ️] 14,702 Tokens (Approximate)
-Maximum context for 8.00 GB of memory: 10240
-Generated content (14,702 tokens) fits within maximum context.
+[ℹ️] Maximum context for 8.00 GB of memory: 10240
+[✅] Generated content (14,702 tokens) fits within maximum context.
 Top 5 largest files (by estimated token count):
 1. /Users/samm/git/sammcj/ingest/main.go (4,682 tokens)
 2. /Users/samm/git/sammcj/ingest/filesystem/filesystem.go (2,694 tokens)
