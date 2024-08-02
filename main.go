@@ -163,7 +163,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Setup progress spinner
-	spinner := utils.SetupSpinner("Traversing directory and building tree...")
+	spinner := utils.SetupSpinner("Traversing directory and building tree..")
 	defer spinner.Finish()
 
 	// If verbose, print active excludes
@@ -290,6 +290,7 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 func handleOutput(rendered string, countTokens bool, encoding string, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
 	if countTokens {
 		tokenCount := token.CountTokens(rendered, encoding)
+		println()
 		utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow)
 	}
 
