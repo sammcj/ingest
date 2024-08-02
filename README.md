@@ -51,8 +51,9 @@ ingest will default to the current working directory if no path is provided, e.g
 ```shell
 $ ingest
 
-⠋ Traversing directory and building tree...  [0s] [i] 9741 Tokens (Approximate)
-[✓] Copied to clipboard successfully.
+⠋ Traversing directory and building tree...  [0s]
+[ℹ️] Tokens (Approximate): 15,945
+[✅] Copied to clipboard successfully.
 ```
 
 Generate a prompt from a directory, including only Python files:
@@ -124,7 +125,7 @@ When using the VRAM estimation feature along with content generation, ingest wil
 ```shell
 ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 8 --quant q4_0 .
 ⠋ Traversing directory and building tree... [0s]
-[i] 14,702 Tokens (Approximate)
+[ℹ️] 14,702 Tokens (Approximate)
 Maximum context for 8.00 GB of memory: 10240
 Generated content (14,702 tokens) fits within maximum context.
 Top 5 largest files (by estimated token count):
@@ -133,7 +134,7 @@ Top 5 largest files (by estimated token count):
 3. /Users/samm/git/sammcj/ingest/README.md (1,895 tokens)
 4. /Users/samm/git/sammcj/ingest/utils/utils.go (948 tokens)
 5. /Users/samm/git/sammcj/ingest/config/config.go (884 tokens)
-[✓] Copied to clipboard successfully.
+[✅] Copied to clipboard successfully.
 ```
 
 Available flags for VRAM estimation:
