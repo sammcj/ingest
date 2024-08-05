@@ -14,13 +14,13 @@ import (
 
 	"github.com/charmbracelet/glamour"
 	"github.com/fatih/color"
-	"github.com/sammcj/gollama/vramestimator"
 	"github.com/sammcj/ingest/config"
 	"github.com/sammcj/ingest/filesystem"
 	"github.com/sammcj/ingest/git"
 	"github.com/sammcj/ingest/template"
 	"github.com/sammcj/ingest/token"
 	"github.com/sammcj/ingest/utils"
+	"github.com/sammcj/quantest"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/spf13/cobra"
 )
@@ -46,13 +46,13 @@ var (
 	promptPrefix         string
 	promptSuffix         string
 	report               bool
-	vramFlag      bool
-	modelIDFlag   string
-	quantFlag     string
-	contextFlag   int
-	kvCacheFlag   string
-	memoryFlag    float64
-	quantTypeFlag string
+	vramFlag             bool
+	modelIDFlag          string
+	quantFlag            string
+	contextFlag          int
+	kvCacheFlag          string
+	memoryFlag           float64
+	quantTypeFlag        string
 	verbose              bool
 	Version              string // This will be set by the linker at build time
 )
@@ -98,7 +98,6 @@ func main() {
 	rootCmd.Flags().StringVar(&kvCacheFlag, "kvcache", "fp16", "vRAM Estimation - KV cache quantization: fp16, q8_0, or q4_0")
 	rootCmd.Flags().Float64Var(&memoryFlag, "memory", 0, "vRAM Estimation - Available memory in GB for context calculation")
 	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
-
 
 	rootCmd.ParseFlags(os.Args[1:])
 
@@ -516,78 +515,47 @@ func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bo
 	return nil
 }
 
-
-
 func performVRAMEstimation(content string) error {
 	if modelIDFlag == "" {
-		return fmt.Errorf("model ID is required for VRAM estimation")
-	}
-
-	var kvCacheQuant vramestimator.KVCacheQuantisation
-	switch kvCacheFlag {
-	case "fp16":
-		kvCacheQuant = vramestimator.KVCacheFP16
-	case "q8_0":
-		kvCacheQuant = vramestimator.KVCacheQ8_0
-	case "q4_0":
-		kvCacheQuant = vramestimator.KVCacheQ4_0
-	default:
-		utils.PrintColouredMessage("❌", fmt.Sprintf("Invalid KV cache quantization: %s. Using default fp16.", kvCacheFlag), color.FgYellow)
-		kvCacheQuant = vramestimator.KVCacheFP16
+		return fmt.Errorf("model ID is required for vRAM estimation")
 	}
 
 	tokenCount := token.CountTokens(content, encoding)
 
-	if memoryFlag > 0 && contextFlag == 0 && quantFlag == "" {
-		// Calculate best BPW
-		bestBPW, err := vramestimator.CalculateBPW(modelIDFlag, memoryFlag, 0, kvCacheQuant, quantTypeFlag, "")
-		if err != nil {
-				utils.PrintColouredMessage("❌", fmt.Sprintf("Error calculating BPW: %v", err), color.FgYellow)
-		}
-		// Check if bestBPW is a string
-		if bpwStr, ok := bestBPW.(string); ok {
-				utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Best BPW for %.2f GB of memory: %s", memoryFlag, bpwStr), color.FgGreen)
-		} else if bpwFloat, ok := bestBPW.(float64); ok {
-				utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Best BPW for %.2f GB of memory: %.2f", memoryFlag, bpwFloat), color.FgGreen)
-		} else {
-				utils.PrintColouredMessage("❌", fmt.Sprintf("Unexpected type for BPW: %T", bestBPW), color.FgYellow)
-		}
+	// TODO: fix this:
+	// quant, err := quantest.GetOllamaQuantLevel(modelIDFlag)
+	// if err != nil {
+	// 	return fmt.Errorf("error getting quantisation level: %w", err)
+	// }
 
-	} else {
-		// Parse the quant flag for other operations
-		bpw, err := vramestimator.ParseBPWOrQuant(quantFlag)
-		if err != nil {
-			utils.PrintColouredMessage("❌", fmt.Sprintf("Error parsing quantization: %v", err), color.FgYellow)
-		}
+	quant := "q4_k_m"
 
-		if memoryFlag > 0 && contextFlag == 0 {
-			// Calculate maximum context
-			maxContext, err := vramestimator.CalculateContext(modelIDFlag, memoryFlag, bpw, kvCacheQuant, "")
-			if err != nil {
-				return fmt.Errorf("error calculating context: %w", err)
-			}
-			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Maximum context for %.2f GB of memory: %d", memoryFlag, maxContext), color.FgGreen)
-			if tokenCount > maxContext {
-				utils.PrintColouredMessage("❗️", fmt.Sprintf("Generated content (%d tokens) exceeds maximum context.", tokenCount), color.FgYellow)
-			} else {
-				utils.PrintColouredMessage("✅", fmt.Sprintf("Generated content (%d tokens) fits within maximum context.", tokenCount), color.FgGreen)
-			}
-		} else if contextFlag > 0 {
-			// Calculate VRAM usage
-			vram, err := vramestimator.CalculateVRAM(modelIDFlag, bpw, contextFlag, kvCacheQuant, "")
-			if err != nil {
-				utils.PrintColouredMessage("❌", fmt.Sprintf("Error calculating VRAM: %v", err), color.FgYellow)
-			}
-			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Estimated VRAM usage: %.2f GB", vram), color.FgGreen)
-			if memoryFlag > 0 {
-				if vram > memoryFlag {
-					utils.PrintColouredMessage("❗️", fmt.Sprintf("Estimated VRAM usage (%.2f GB) exceeds available memory (%.2f GB).", vram, memoryFlag), color.FgYellow)
-				} else {
-					utils.PrintColouredMessage("✅", fmt.Sprintf("Estimated VRAM usage (%.2f GB) fits within available memory (%.2f GB).", vram, memoryFlag), color.FgGreen)
-				}
-			}
+	estimation, err := quantest.EstimateVRAMForModel(modelIDFlag, memoryFlag, tokenCount, quant, kvCacheFlag)
+	if err != nil {
+		return fmt.Errorf("error estimating vRAM: %w", err)
+	}
+
+	// Print the estimation results
+	fmt.Printf("\nVRAM Estimation Results:\n")
+	fmt.Printf("Model: %s\n", estimation.ModelName)
+	fmt.Printf("Estimated vRAM Required: %.2f GB\n", estimation.EstimatedVRAM)
+	fmt.Printf("Fits Available vRAM: %v\n", estimation.FitsAvailable)
+	fmt.Printf("Max Context Size: %d\n", estimation.MaxContextSize)
+	fmt.Printf("Maximum Quantisation: %s\n", estimation.MaximumQuant)
+
+	// Generate and print the quant table
+	table, err := quantest.GenerateQuantTable(estimation.ModelConfig, memoryFlag)
+	if err != nil {
+		return fmt.Errorf("error generating quant table: %w", err)
+	}
+	fmt.Println(quantest.PrintFormattedTable(table))
+
+	// Check if the content fits within the specified constraints
+	if memoryFlag > 0 {
+		if tokenCount > estimation.MaxContextSize {
+			utils.PrintColouredMessage("❗️", fmt.Sprintf("Generated content (%d tokens) exceeds maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgYellow)
 		} else {
-			return fmt.Errorf("invalid combination of flags. Please specify either --memory, --context, or both")
+			utils.PrintColouredMessage("✅", fmt.Sprintf("Generated content (%d tokens) fits within maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgGreen)
 		}
 	}
 

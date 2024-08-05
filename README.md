@@ -82,12 +82,12 @@ ingest -o output.md /path/to/project
 
 ### VRAM Estimation and Model Compatibility
 
-Ingest includes a feature to estimate VRAM requirements and check model compatibility using the [Gollama](https://github.com/sammcj/gollama)'s vramestimator package. This helps you determine if your generated content will fit within the specified model, VRAM, and quantization constraints.
+Ingest includes a feature to estimate VRAM requirements and check model compatibility using the [Gollama](https://github.com/sammcj/gollama)'s vramestimator package. This helps you determine if your generated content will fit within the specified model, VRAM, and quantisation constraints.
 
 To use this feature, add the following flags to your ingest command:
 
 ```shell
-ingest --vram --model <model_id> [--memory <memory_in_gb>] [--quant <quantization>] [--context <context_length>] [--kvcache <kv_cache_quant>] [--quanttype <quant_type>] [other flags] <paths>
+ingest --vram --model <model_id> [--memory <memory_in_gb>] [--quant <quantisation>] [--context <context_length>] [--kvcache <kv_cache_quant>] [--quanttype <quant_type>] [other flags] <paths>
 ```
 
 Examples:
@@ -142,10 +142,10 @@ Available flags for VRAM estimation:
 - `--vram`: Enable VRAM estimation and model compatibility check
 - `--model`: Specify the model ID to check against (required for estimation)
 - `--memory`: Specify the available memory in GB for context calculation (optional)
-- `--quant`: Specify the quantization type (e.g., q4_k_m) or bits per weight (e.g., 5.0)
+- `--quant`: Specify the quantisation type (e.g., q4_k_m) or bits per weight (e.g., 5.0)
 - `--context`: Specify the context length for VRAM estimation (optional)
-- `--kvcache`: Specify the KV cache quantization (fp16, q8_0, or q4_0)
-- `--quanttype`: Specify the quantization type (gguf or exl2)
+- `--kvcache`: Specify the KV cache quantisation (fp16, q8_0, or q4_0)
+- `--quanttype`: Specify the quantisation type (gguf or exl2)
 
 Ingest will provide appropriate output based on the combination of flags used, such as estimating VRAM usage, calculating maximum context, or finding the best BPW. If the generated content fits within the specified constraints, you'll see a success message. Otherwise, you'll receive a warning that the content may not fit.
 
