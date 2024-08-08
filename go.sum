@@ -87,6 +87,8 @@ github.com/sammcj/gollama v1.26.0 h1:XUpkdcFJaF3LFpXVWdLdSjjFh0uPh/e/3QG8d0BxVgI
 github.com/sammcj/gollama v1.26.0/go.mod h1:NiFfpwIXyZyCEB84Zh0dWA90jeuRzuI65Tp7ySVPSJY=
 github.com/sammcj/quantest v0.0.9 h1:Usfms28kWXeumisRIUEnR6hfATRIJtzMJpNJ0ZZREo8=
 github.com/sammcj/quantest v0.0.9/go.mod h1:XHbYHQmb4n8CFvIaUiiZvdfG5I34owwFyYabLcRvCa4=
+github.com/sammcj/quantest v0.0.10 h1:C8BL/r0NFn90Bw0id4x8DmJ0M3328L+2eSCwxxh2WoY=
+github.com/sammcj/quantest v0.0.10/go.mod h1:XHbYHQmb4n8CFvIaUiiZvdfG5I34owwFyYabLcRvCa4=
 github.com/sashabaranov/go-openai v1.27.1 h1:7Nx6db5NXbcoutNmAUQulEQZEpHG/SkzfexP2X5RWMk=
 github.com/sashabaranov/go-openai v1.27.1/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/schollz/progressbar/v3 v3.14.6 h1:GyjwcWBAf+GFDMLziwerKvpuS7ZF+mNTAXIB2aspiZs=
