@@ -1,6 +1,6 @@
 module github.com/sammcj/ingest
 
-go 1.22.5
+go 1.22.6
 
 require (
 	github.com/atotto/clipboard v0.1.4
@@ -40,7 +40,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.33.0 // indirect
-	github.com/sammcj/quantest v0.0.9
+	github.com/sammcj/quantest v0.0.10
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/yuin/goldmark v1.7.4 // indirect
