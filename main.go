@@ -92,6 +92,7 @@ func main() {
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
+	rootCmd.Flags().BoolVar(&vramFlag, "fits", false, "Estimate vRAM usage")
 	rootCmd.Flags().StringVar(&modelIDFlag, "model", "", "vRAM Estimation - Model ID")
 	rootCmd.Flags().StringVar(&quantFlag, "quant", "", "vRAM Estimation - Quantization type (e.g., q4_k_m) or bits per weight (e.g., 5.0)")
 	rootCmd.Flags().IntVar(&contextFlag, "context", 0, "vRAM Estimation - Context length for vRAM estimation")
