@@ -92,12 +92,12 @@ func main() {
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
-	rootCmd.Flags().BoolVar(&vramFlag, "fits", false, "Estimate vRAM usage")
 	rootCmd.Flags().StringVar(&modelIDFlag, "model", "", "vRAM Estimation - Model ID")
 	rootCmd.Flags().StringVar(&quantFlag, "quant", "", "vRAM Estimation - Quantization type (e.g., q4_k_m) or bits per weight (e.g., 5.0)")
 	rootCmd.Flags().IntVar(&contextFlag, "context", 0, "vRAM Estimation - Context length for vRAM estimation")
 	rootCmd.Flags().StringVar(&kvCacheFlag, "kvcache", "fp16", "vRAM Estimation - KV cache quantization: fp16, q8_0, or q4_0")
 	rootCmd.Flags().Float64Var(&memoryFlag, "memory", 0, "vRAM Estimation - Available memory in GB for context calculation")
+	rootCmd.Flags().Float64Var(&memoryFlag, "fits", 0, "vRAM Estimation - Available memory in GB for context calculation")
 	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
 
 	rootCmd.ParseFlags(os.Args[1:])
