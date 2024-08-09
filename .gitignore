@@ -31,3 +31,5 @@ build/
 **/*.swp
 **/*.log
 **/ingest.out.md
+
+vendor/
