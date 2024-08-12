@@ -14,6 +14,7 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
+- Estimate vRAM requirements and check model compatibility using another package I've created called [quantest](https://github.com/sammcj/quantest)
 - Parse output directly to LLMs such as Ollama or any OpenAI compatible API for processing
 - Generate and include git diffs and logs
 - Count approximate tokens for LLM compatibility
@@ -21,7 +22,6 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Copy output to clipboard (when available)
 - Export to file or print to console
 - Optional JSON output
-- Estimate VRAM requirements and check model compatibility using the vramestimator package
 
 ## Installation
 
