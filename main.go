@@ -55,6 +55,7 @@ var (
 	quantTypeFlag        string
 	verbose              bool
 	Version              string // This will be set by the linker at build time
+	rootCmd              *cobra.Command
 )
 
 type GitData struct {
@@ -64,14 +65,16 @@ type GitData struct {
 	GitLogBranch  string
 }
 
-func main() {
-	rootCmd := &cobra.Command{
-		Use:   "ingest [flags] [paths...]",
+func init() {
+	rootCmd = &cobra.Command{
+		Use:   "ingest [flags] [path ...]",
 		Short: "Generate a markdown LLM prompt from files and directories",
 		Long:  `ingest is a command-line tool to generate an LLM prompt from files and directories.`,
 		RunE:  run,
+		Args:  cobra.ArbitraryArgs,
 	}
 
+	// Define flags
 	rootCmd.Flags().Bool("llm", false, "Send output to any OpenAI compatible API for inference")
 	rootCmd.Flags().BoolP("version", "V", false, "Print the version number")
 	rootCmd.Flags().BoolVar(&excludeFromTree, "exclude-from-tree", false, "Exclude files/folders from the source tree based on exclude patterns")
@@ -107,16 +110,19 @@ func main() {
 	rootCmd.Flags().Float64Var(&memoryFlag, "fits", 0, "vRAM Estimation - Available memory in GB for context calculation")
 	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
 
-	if err := rootCmd.ParseFlags(os.Args[1:]); err != nil {
-		fmt.Printf("Error parsing flags: %v\n", err)
-		os.Exit(1)
-	}
+	// Add completion command
+	rootCmd.AddCommand(&cobra.Command{
+		Use:                   "completion [bash|zsh|fish]",
+		Short:                 "Generate completion script",
+		Long:                  `To load completions: Bash: $ source <(ingest completion bash) Zsh: $ source <(ingest completion zsh) Fish: $ ingest completion`,
+		DisableFlagsInUseLine: true,
+		ValidArgs:             []string{"bash", "zsh", "fish"},
+		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		Run:                   runCompletion,
+	})
+}
 
-	// if run with no arguments, assume the current directory
-	if len(rootCmd.Flags().Args()) == 0 {
-		rootCmd.SetArgs([]string{"."})
-	}
-
+func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -124,6 +130,15 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	// If no arguments are provided, use the current directory
+	if len(args) == 0 {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		args = []string{currentDir}
+	}
+
 	if version, _ := cmd.Flags().GetBool("version"); version {
 		fmt.Printf("ingest version %s\n", Version)
 		return nil
@@ -138,9 +153,13 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to ensure config directories: %w", err)
 	}
 
-	paths := args
-	if len(paths) == 0 {
-		paths = []string{"."}
+	// If no arguments are provided, use the current directory
+	if len(args) == 0 {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		args = []string{currentDir}
 	}
 
 	// Handle the prompt flag
@@ -174,7 +193,6 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-
 	// If verbose, print active excludes
 	if verbose {
 		activeExcludes, err := filesystem.ReadExcludePatterns(patternExclude)
@@ -189,7 +207,7 @@ func run(cmd *cobra.Command, args []string) error {
 	var allTrees []string
 	var gitData []GitData
 
-	for _, path := range paths {
+	for _, path := range args {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for %s: %w", path, err)
@@ -276,7 +294,6 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Render template
-
 	rendered, err := template.RenderTemplate(tmpl, data)
 	if err != nil {
 		return fmt.Errorf("failed to render template: %w", err)
@@ -591,4 +608,21 @@ func performVRAMEstimation(content string) error {
 	}
 
 	return nil
+}
+
+func runCompletion(cmd *cobra.Command, args []string) {
+	switch args[0] {
+	case "bash":
+		if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
+			fmt.Printf("Error generating bash completion: %v\n", err)
+		}
+	case "zsh":
+		if err := cmd.Root().GenZshCompletion(os.Stdout); err != nil {
+			fmt.Printf("Error generating zsh completion: %v\n", err)
+		}
+	case "fish":
+		if err := cmd.Root().GenFishCompletion(os.Stdout, true); err != nil {
+			fmt.Printf("Error generating fish completion: %v\n", err)
+		}
+	}
 }
