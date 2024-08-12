@@ -55,16 +55,26 @@ var (
 	quantTypeFlag        string
 	verbose              bool
 	Version              string // This will be set by the linker at build time
+	rootCmd              *cobra.Command
 )
 
-func main() {
-	rootCmd := &cobra.Command{
-		Use:   "ingest [flags] [paths...]",
+type GitData struct {
+	Path          string
+	GitDiff       string
+	GitDiffBranch string
+	GitLogBranch  string
+}
+
+func init() {
+	rootCmd = &cobra.Command{
+		Use:   "ingest [flags] [path ...]",
 		Short: "Generate a markdown LLM prompt from files and directories",
 		Long:  `ingest is a command-line tool to generate an LLM prompt from files and directories.`,
 		RunE:  run,
+		Args:  cobra.ArbitraryArgs,
 	}
 
+	// Define flags
 	rootCmd.Flags().Bool("llm", false, "Send output to any OpenAI compatible API for inference")
 	rootCmd.Flags().BoolP("version", "V", false, "Print the version number")
 	rootCmd.Flags().BoolVar(&excludeFromTree, "exclude-from-tree", false, "Exclude files/folders from the source tree based on exclude patterns")
@@ -92,7 +102,6 @@ func main() {
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
-	rootCmd.Flags().BoolVar(&vramFlag, "fits", false, "Estimate vRAM usage")
 	rootCmd.Flags().StringVar(&modelIDFlag, "model", "", "vRAM Estimation - Model ID")
 	rootCmd.Flags().StringVar(&quantFlag, "quant", "", "vRAM Estimation - Quantization type (e.g., q4_k_m) or bits per weight (e.g., 5.0)")
 	rootCmd.Flags().IntVar(&contextFlag, "context", 0, "vRAM Estimation - Context length for vRAM estimation")
@@ -101,13 +110,19 @@ func main() {
 	rootCmd.Flags().Float64Var(&memoryFlag, "fits", 0, "vRAM Estimation - Available memory in GB for context calculation")
 	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
 
-	rootCmd.ParseFlags(os.Args[1:])
+	// Add completion command
+	rootCmd.AddCommand(&cobra.Command{
+		Use:                   "completion [bash|zsh|fish]",
+		Short:                 "Generate completion script",
+		Long:                  `To load completions: Bash: $ source <(ingest completion bash) Zsh: $ source <(ingest completion zsh) Fish: $ ingest completion`,
+		DisableFlagsInUseLine: true,
+		ValidArgs:             []string{"bash", "zsh", "fish"},
+		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
+		Run:                   runCompletion,
+	})
+}
 
-	// if run with no arguments, assume the current directory
-	if len(rootCmd.Flags().Args()) == 0 {
-		rootCmd.SetArgs([]string{"."})
-	}
-
+func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -115,6 +130,15 @@ func main() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	// If no arguments are provided, use the current directory
+	if len(args) == 0 {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		args = []string{currentDir}
+	}
+
 	if version, _ := cmd.Flags().GetBool("version"); version {
 		fmt.Printf("ingest version %s\n", Version)
 		return nil
@@ -129,9 +153,13 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to ensure config directories: %w", err)
 	}
 
-	paths := args
-	if len(paths) == 0 {
-		paths = []string{"."}
+	// If no arguments are provided, use the current directory
+	if len(args) == 0 {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+		args = []string{currentDir}
 	}
 
 	// Handle the prompt flag
@@ -148,14 +176,8 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	path := args[0]
 	includePatterns, _ := cmd.Flags().GetStringSlice("include")
 	excludePatterns, _ := cmd.Flags().GetStringSlice("exclude")
-
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path: %w", err)
-	}
 
 	// Setup template
 	tmpl, err := template.SetupTemplate(templatePath)
@@ -165,7 +187,11 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// Setup progress spinner
 	spinner := utils.SetupSpinner("Traversing directory and building tree..")
-	defer spinner.Finish()
+	defer func() {
+		if err := spinner.Finish(); err != nil {
+			fmt.Printf("Error finishing spinner: %v\n", err)
+		}
+	}()
 
 	// If verbose, print active excludes
 	if verbose {
@@ -179,75 +205,95 @@ func run(cmd *cobra.Command, args []string) error {
 	// Process all provided paths
 	var allFiles []filesystem.FileInfo
 	var allTrees []string
+	var gitData []GitData
 
-	for _, path := range paths {
+	for _, path := range args {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for %s: %w", path, err)
 		}
 
-		// Traverse directory with parallel processing
-		tree, files, err := filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock)
+		fileInfo, err := os.Stat(absPath)
 		if err != nil {
-			return fmt.Errorf("failed to process %s: %w", path, err)
+			return fmt.Errorf("failed to get file info for %s: %w", path, err)
+		}
+
+		var files []filesystem.FileInfo
+		var tree string
+
+		if fileInfo.IsDir() {
+			// Existing directory processing logic
+			tree, files, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock)
+			if err != nil {
+				return fmt.Errorf("failed to process directory %s: %w", path, err)
+			}
+			tree = fmt.Sprintf("%s:\n%s", absPath, tree)
+		} else {
+			// New file processing logic
+			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock)
+			if err != nil {
+				return fmt.Errorf("failed to process file %s: %w", path, err)
+			}
+			files = []filesystem.FileInfo{file}
+			tree = fmt.Sprintf("File: %s", absPath)
 		}
 
 		allFiles = append(allFiles, files...)
-		allTrees = append(allTrees, fmt.Sprintf("%s:\n%s", absPath, tree))
-	}
+		allTrees = append(allTrees, tree)
 
-	// Handle git operations
-	gitDiff := ""
-	if diff {
-		spinner.Describe("Generating git diff...")
-		gitDiff, err = git.GetGitDiff(absPath)
-		if err != nil {
-			return fmt.Errorf("failed to get git diff: %w", err)
-		}
-	}
+		// Handle git operations for each path
+		gitDiffContent := ""
+		gitDiffBranchContent := ""
+		gitLogBranchContent := ""
 
-	gitDiffBranchContent := ""
-	if gitDiffBranch != "" {
-		spinner.Describe("Generating git diff between two branches...")
-		branches := strings.Split(gitDiffBranch, ",")
-		if len(branches) != 2 {
-			spinner.Finish()
-			return fmt.Errorf("please provide exactly two branches separated by a comma")
+		if diff {
+			gitDiffContent, err = git.GetGitDiff(absPath)
+			if err != nil {
+				// Log the error but continue processing
+				fmt.Printf("Warning: failed to get git diff for %s: %v\n", absPath, err)
+			}
 		}
-		gitDiffBranchContent, err = git.GetGitDiffBetweenBranches(absPath, branches[0], branches[1])
-		if err != nil {
-			return fmt.Errorf("failed to get git diff between branches: %w", err)
-		}
-	}
 
-	gitLogBranchContent := ""
-	if gitLogBranch != "" {
-		spinner.Describe("Generating git log between two branches...")
-		branches := strings.Split(gitLogBranch, ",")
-		if len(branches) != 2 {
-			spinner.Finish()
-			return fmt.Errorf("please provide exactly two branches separated by a comma")
+		if gitDiffBranch != "" {
+			branches := strings.Split(gitDiffBranch, ",")
+			if len(branches) == 2 {
+				gitDiffBranchContent, err = git.GetGitDiffBetweenBranches(absPath, branches[0], branches[1])
+				if err != nil {
+					fmt.Printf("Warning: failed to get git diff between branches for %s: %v\n", absPath, err)
+				}
+			}
 		}
-		gitLogBranchContent, err = git.GetGitLog(absPath, branches[0], branches[1])
-		if err != nil {
-			return fmt.Errorf("failed to get git log: %w", err)
-		}
-	}
 
-	spinner.Finish()
+		if gitLogBranch != "" {
+			branches := strings.Split(gitLogBranch, ",")
+			if len(branches) == 2 {
+				gitLogBranchContent, err = git.GetGitLog(absPath, branches[0], branches[1])
+				if err != nil {
+					fmt.Printf("Warning: failed to get git log for %s: %v\n", absPath, err)
+				}
+			}
+		}
+
+		gitData = append(gitData, GitData{
+			Path:          absPath,
+			GitDiff:       gitDiffContent,
+			GitDiffBranch: gitDiffBranchContent,
+			GitLogBranch:  gitLogBranchContent,
+		})
+	}
 
 	// Prepare data for template
 	data := map[string]interface{}{
-		"source_trees":       strings.Join(allTrees, "\n\n"),
-		"files":              allFiles,
-		"absolute_code_path": absPath,
-		"git_diff":           gitDiff,
-		"git_diff_branch":    gitDiffBranchContent,
-		"git_log_branch":     gitLogBranchContent,
+		"source_trees": strings.Join(allTrees, "\n\n"),
+		"files":        allFiles,
+		"git_data":     gitData,
+	}
+
+	if err := spinner.Finish(); err != nil {
+		return fmt.Errorf("failed to finish spinner: %w", err)
 	}
 
 	// Render template
-
 	rendered, err := template.RenderTemplate(tmpl, data)
 	if err != nil {
 		return fmt.Errorf("failed to render template: %w", err)
@@ -562,4 +608,21 @@ func performVRAMEstimation(content string) error {
 	}
 
 	return nil
+}
+
+func runCompletion(cmd *cobra.Command, args []string) {
+	switch args[0] {
+	case "bash":
+		if err := cmd.Root().GenBashCompletion(os.Stdout); err != nil {
+			fmt.Printf("Error generating bash completion: %v\n", err)
+		}
+	case "zsh":
+		if err := cmd.Root().GenZshCompletion(os.Stdout); err != nil {
+			fmt.Printf("Error generating zsh completion: %v\n", err)
+		}
+	case "fish":
+		if err := cmd.Root().GenFishCompletion(os.Stdout, true); err != nil {
+			fmt.Printf("Error generating fish completion: %v\n", err)
+		}
+	}
 }

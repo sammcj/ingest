@@ -403,3 +403,29 @@ func isExcluded(path string, patterns []string) bool {
 	}
 	return false
 }
+
+func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool) (FileInfo, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return FileInfo{}, fmt.Errorf("failed to read file %s: %w", path, err)
+	}
+
+	code := string(content)
+	if lineNumber {
+		code = addLineNumbers(code)
+	}
+	if !noCodeblock {
+		code = wrapCodeBlock(code, filepath.Ext(path))
+	}
+
+	filePath := path
+	if relativePaths {
+		filePath = filepath.Base(path)
+	}
+
+	return FileInfo{
+		Path:      filePath,
+		Extension: filepath.Ext(path),
+		Code:      code,
+	}, nil
+}
