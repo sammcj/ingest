@@ -89,6 +89,7 @@ func main() {
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
+	rootCmd.Flags().Bool("s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
@@ -98,7 +99,6 @@ func main() {
 	rootCmd.Flags().IntVar(&contextFlag, "context", 0, "vRAM Estimation - Context length for vRAM estimation")
 	rootCmd.Flags().StringVar(&kvCacheFlag, "kvcache", "fp16", "vRAM Estimation - KV cache quantization: fp16, q8_0, or q4_0")
 	rootCmd.Flags().Float64Var(&memoryFlag, "memory", 0, "vRAM Estimation - Available memory in GB for context calculation")
-	rootCmd.Flags().Float64Var(&memoryFlag, "fits", 0, "vRAM Estimation - Available memory in GB for context calculation")
 	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
 
 	rootCmd.ParseFlags(os.Args[1:])
@@ -251,6 +251,14 @@ func run(cmd *cobra.Command, args []string) error {
 	rendered, err := template.RenderTemplate(tmpl, data)
 	if err != nil {
 		return fmt.Errorf("failed to render template: %w", err)
+	}
+
+	// Check if auto-save is enabled in config or flag
+	autoSave, _ := cmd.Flags().GetBool("auto-save")
+	if cfg.AutoSave || autoSave {
+		if err := autoSaveOutput(rendered, absPath); err != nil {
+			utils.PrintColouredMessage("❌", fmt.Sprintf("Auto-save error: %v", err), color.FgRed)
+		}
 	}
 
 	// VRAM estimation
@@ -561,5 +569,27 @@ func performVRAMEstimation(content string) error {
 		}
 	}
 
+	return nil
+}
+
+func autoSaveOutput(content string, sourcePath string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	ingestDir := filepath.Join(homeDir, "ingest")
+	if err := os.MkdirAll(ingestDir, 0700); err != nil {
+		return fmt.Errorf("failed to create ingest directory: %w", err)
+	}
+
+	fileName := filepath.Base(sourcePath) + ".md"
+	filePath := filepath.Join(ingestDir, fileName)
+
+	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	utils.PrintColouredMessage("✅", fmt.Sprintf("Automatically saved to %s", filePath), color.FgGreen)
 	return nil
 }

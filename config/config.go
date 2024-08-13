@@ -19,6 +19,7 @@ type OllamaConfig struct {
 type Config struct {
 	Ollama []OllamaConfig `json:"ollama"`
 	LLM    LLMConfig      `json:"llm"`
+	AutoSave bool         `json:"auto_save"`
 }
 
 type LLMConfig struct {
@@ -89,6 +90,7 @@ func createDefaultConfig(configPath string) (*Config, error) {
 			Model:     "llama3.1:8b-instruct-q6_K",
 			MaxTokens: 2048,
 		},
+		AutoSave: false,
 	}
 
 	err := os.MkdirAll(filepath.Dir(configPath), 0750)
