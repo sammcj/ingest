@@ -240,6 +240,7 @@ These directories will be created automatically on first run, along with README 
 - `--print-default-excludes`: Print the default exclude patterns
 - `--print-default-template`: Print the default template
 - `--report`: Print the largest parsed files
+- `--config`: Opens the config file in the default editor
 - `--verbose`: Print verbose output
 - `-V, --version`: Print the version number (WIP - still trying to get this to work nicely)
 

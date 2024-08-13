@@ -101,6 +101,7 @@ func init() {
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
 	rootCmd.Flags().BoolP("save", "s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
+	rootCmd.Flags().Bool("config", false, "Open the config file in the default editor")
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
@@ -148,6 +149,13 @@ func run(cmd *cobra.Command, args []string) error {
 	if version, _ := cmd.Flags().GetBool("version"); version {
 		fmt.Printf("ingest version %s\n", Version)
 		return nil
+	}
+
+	if configFlag, _ := cmd.Flags().GetBool("config"); configFlag {
+		if err := config.OpenConfig(); err != nil {
+			return fmt.Errorf("failed to open config: %w", err)
+		}
+		os.Exit(0)
 	}
 
 	cfg, err := config.LoadConfig()

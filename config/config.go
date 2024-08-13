@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/mitchellh/go-homedir"
@@ -34,6 +35,7 @@ type LLMConfig struct {
 	APIType          string   `json:"llm_api_type"`
 }
 
+// loads the config file
 func LoadConfig() (*Config, error) {
 	home, err := homedir.Dir()
 	if err != nil {
@@ -110,6 +112,7 @@ func createDefaultConfig(configPath string) (*Config, error) {
 	return &defaultConfig, nil
 }
 
+// returns the default base URL for the LLM API
 func getDefaultBaseURL() string {
 	if url := os.Getenv("OPENAI_API_BASE"); url != "" {
 		return url
@@ -118,4 +121,33 @@ func getDefaultBaseURL() string {
 		return url + "/v1"
 	}
 	return "http://localhost:11434/v1"
+}
+
+// opens the config file in the default editor
+func OpenConfig() error {
+	home, err := homedir.Dir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	configPath := filepath.Join(home, ".config", "ingest", "ingest.json")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return fmt.Errorf("config file does not exist")
+	}
+
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "vim"
+	}
+
+	return runCommand(editor, configPath)
+}
+
+// runs a command in the shell
+func runCommand(command string, args ...string) error {
+	cmd := exec.Command(command, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
