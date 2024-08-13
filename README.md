@@ -199,7 +199,7 @@ See `ingest completion -h` for more information.
 
 ## Configuration
 
-Ingest uses a configuration file located at `~/.config/ingest/config.json`.
+Ingest uses a configuration file located at `~/.config/ingest/ingest.json`.
 
 You can make Ollama processing run without prompting setting `"llm_auto_run": true` in the config file.
 
