@@ -57,6 +57,7 @@ func getDefaultTemplate() (string, error) {
 	return readEmbeddedTemplate()
 }
 
+
 func readEmbeddedTemplate() (string, error) {
 	return `
 Source Trees:
@@ -69,6 +70,24 @@ Source Trees:
 
 {{.Code}}
 
+{{end}}
+{{end}}
+
+{{range .git_data}}
+{{if or .GitDiff .GitDiffBranch .GitLogBranch}}
+Git Information for {{.Path}}:
+{{if .GitDiff}}
+Git Diff:
+{{.GitDiff}}
+{{end}}
+{{if .GitDiffBranch}}
+Git Diff Between Branches:
+{{.GitDiffBranch}}
+{{end}}
+{{if .GitLogBranch}}
+Git Log Between Branches:
+{{.GitLogBranch}}
+{{end}}
 {{end}}
 {{end}}
 `, nil

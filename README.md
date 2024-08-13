@@ -22,6 +22,7 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Copy output to clipboard (when available)
 - Export to file or print to console
 - Optional JSON output
+- Shell completions for Bash, Zsh, and Fish
 
 ## Installation
 
@@ -78,6 +79,12 @@ Generate a prompt and save to a file:
 
 ```shell
 ingest -o output.md /path/to/project
+```
+
+You can also provide individual files or multiple paths:
+
+```shell
+ingest /path/to/file /path/to/directory
 ```
 
 ### VRAM Estimation and Model Compatibility
@@ -172,6 +179,16 @@ You can provide a prompt suffix to append to the generated prompt:
 ```shell
 ingest --llm -p "explain this code" /path/to/project
 ```
+
+## Shell Completions
+
+Ingest includes shell completions for Bash, Zsh, and Fish.
+
+```shell
+source <(ingest completion zsh)
+```
+
+See `ingest completion -h` for more information.
 
 ## Configuration
 
