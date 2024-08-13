@@ -22,6 +22,7 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Copy output to clipboard (when available)
 - Export to file or print to console
 - Optional JSON output
+- Optionally save output to a file in ~/ingest
 - Shell completions for Bash, Zsh, and Fish
 
 ## Installation
@@ -85,6 +86,12 @@ You can also provide individual files or multiple paths:
 
 ```shell
 ingest /path/to/file /path/to/directory
+```
+
+Save output to to ~/ingest/<directory_name>.md:
+
+```shell
+ingest --save /path/to/project
 ```
 
 ### VRAM Estimation and Model Compatibility

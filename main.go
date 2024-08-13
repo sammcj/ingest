@@ -84,7 +84,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&printDefaultExcludes, "print-default-excludes", false, "Print the default exclude patterns")
 	rootCmd.Flags().BoolVar(&printDefaultTemplate, "print-default-template", false, "Print the default template")
 	rootCmd.Flags().BoolVar(&relativePaths, "relative-paths", false, "Use relative paths instead of absolute paths, including the parent directory")
-	rootCmd.Flags().BoolVar(&report, "report", true, "Report the top 5 largest files included in the output")
+	rootCmd.Flags().BoolVar(&report, "report", true, "Report the top 10 largest files included in the output")
 	rootCmd.Flags().BoolVar(&tokens, "tokens", true, "Display the token count of the generated prompt")
 	rootCmd.Flags().BoolVarP(&diff, "diff", "d", false, "Include git diff")
 	rootCmd.Flags().BoolVarP(&lineNumber, "line-number", "l", false, "Add line numbers to the source code")
@@ -99,7 +99,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
-	rootCmd.Flags().Bool("s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
+	rootCmd.Flags().Bool("save", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
@@ -299,11 +299,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to render template: %w", err)
 	}
 
-	// Check if auto-save is enabled in config or flag
-	autoSave, _ := cmd.Flags().GetBool("auto-save")
+	// Check if save is set in config or flag
+	autoSave, _ := cmd.Flags().GetBool("save")
 	if cfg.AutoSave || autoSave {
-		if err := autoSaveOutput(rendered, absPath); err != nil {
-			utils.PrintColouredMessage("❌", fmt.Sprintf("Auto-save error: %v", err), color.FgRed)
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		if err := autoSaveOutput(rendered, currentDir); err != nil {
+			utils.PrintColouredMessage("❌", fmt.Sprintf("Error saving file: %v", err), color.FgRed)
 		}
 	}
 
@@ -327,6 +332,9 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Print all collected messages at the end
+	utils.PrintMessages()
+
 	return nil
 }
 
@@ -335,18 +343,42 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		return len(files[i].Code) > len(files[j].Code)
 	})
 
-	fmt.Println("\nTop 5 largest files (by estimated token count):")
-	for i, file := range files[:min(5, len(files))] {
-		tokenCount := token.CountTokens(file.Code, encoding)
-		fmt.Printf("%d. %s (%s tokens)\n", i+1, file.Path, utils.FormatNumber(tokenCount))
+	// fmt.Println("Top 10 largest files (by estimated token count):")
+	// print this in colour
+	utils.PrintColouredMessage("ℹ️", "Top 10 largest files (by estimated token count):", color.FgCyan)
+	colourRange := []*color.Color{
+		color.New(color.FgRed),
+		color.New(color.FgRed),
+		color.New(color.FgRed),
+		color.New(color.FgRed),
+		color.New(color.FgRed),
+		color.New(color.FgYellow),
+		color.New(color.FgYellow),
+		color.New(color.FgYellow),
+		color.New(color.FgYellow),
+		color.New(color.FgYellow),
 	}
+
+	// print the files
+	for i, file := range files {
+		tokenCount := token.CountTokens(file.Code, encoding)
+		// get the colour
+		colour := colourRange[i]
+		fmt.Printf("- %d. %s (%s tokens)\n", i+1, file.Path, colour.Sprint(utils.FormatNumber(tokenCount)))
+		// break after 10
+		if i == 9 {
+			break
+		}
+	}
+
+	fmt.Println()
 }
 
 func handleOutput(rendered string, countTokens bool, encoding string, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
 	if countTokens {
 		tokenCount := token.CountTokens(rendered, encoding)
 		println()
-		utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow)
+		utils.AddMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow, 1)
 	}
 
 	if report {
@@ -368,7 +400,7 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 		if !noClipboard {
 			err := utils.CopyToClipboard(rendered)
 			if err == nil {
-				utils.PrintColouredMessage("✅", "Copied to clipboard successfully.", color.FgGreen)
+				utils.AddMessage("✅", "Copied to clipboard successfully.", color.FgGreen, 5)
 				return nil
 			}
 			// If clipboard copy failed, fall back to console output
@@ -380,7 +412,7 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 			if err != nil {
 				return fmt.Errorf("failed to write to file: %w", err)
 			}
-			utils.PrintColouredMessage("✅", fmt.Sprintf("Written to file: %s", output), color.FgGreen)
+			utils.AddMessage("✅", fmt.Sprintf("Written to file: %s", output), color.FgGreen, 20)
 		} else {
 			// If no output file is specified, print to console
 			fmt.Print(rendered)
@@ -443,7 +475,7 @@ func printExcludePatterns(patterns []string) {
 func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool, encoding string) error {
 	if countTokens {
 		tokenCount := token.CountTokens(rendered, encoding)
-		utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow)
+		utils.AddMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow, 40)
 	}
 
 	if promptPrefix != "" {
@@ -591,13 +623,18 @@ func performVRAMEstimation(content string) error {
 		return fmt.Errorf("error estimating vRAM: %w", err)
 	}
 
-	// Print the estimation results
-	fmt.Printf("\nVRAM Estimation Results:\n")
-	fmt.Printf("Model: %s\n", estimation.ModelName)
-	fmt.Printf("Estimated vRAM Required: %.2f GB\n", estimation.EstimatedVRAM)
-	fmt.Printf("Fits Available vRAM: %v\n", estimation.FitsAvailable)
-	fmt.Printf("Max Context Size: %d\n", estimation.MaxContextSize)
-	fmt.Printf("Maximum Quantisation: %s\n", estimation.MaximumQuant)
+	utils.AddMessage("ℹ️", fmt.Sprintf("Model: %s", estimation.ModelName), color.FgCyan, 10)
+	utils.AddMessage("ℹ️", fmt.Sprintf("Estimated vRAM Required: %.2f GB", estimation.EstimatedVRAM), color.FgCyan, 3)
+	// print the vram available
+	utils.AddMessage("ℹ️", fmt.Sprintf("Available vRAM: %.2f GB", memoryFlag), color.FgCyan, 10)
+	if estimation.FitsAvailable {
+		utils.AddMessage("✅", "Fits Available vRAM", color.FgGreen, 2)
+	} else {
+		utils.AddMessage("❌", "Does Not Fit Available vRAM", color.FgYellow, 2)
+	}
+	utils.AddMessage("ℹ️", fmt.Sprintf("Max Context Size: %d", estimation.MaxContextSize), color.FgCyan, 8)
+	// utils.AddMessage("ℹ️", fmt.Sprintf("Maximum Quantisation: %s", estimation.MaximumQuant), color.FgCyan, 10)
+	// TODO: - this isn't that useful, come up with something smarter
 
 	// Generate and print the quant table
 	table, err := quantest.GenerateQuantTable(estimation.ModelConfig, memoryFlag)
@@ -609,9 +646,9 @@ func performVRAMEstimation(content string) error {
 	// Check if the content fits within the specified constraints
 	if memoryFlag > 0 {
 		if tokenCount > estimation.MaxContextSize {
-			utils.PrintColouredMessage("❗️", fmt.Sprintf("Generated content (%d tokens) exceeds maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgYellow)
+			utils.AddMessage("❗️", fmt.Sprintf("Generated content (%d tokens) exceeds maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgYellow, 2)
 		} else {
-			utils.PrintColouredMessage("✅", fmt.Sprintf("Generated content (%d tokens) fits within maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgGreen)
+			utils.AddMessage("✅", fmt.Sprintf("Generated content (%d tokens) fits within maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgGreen, 2)
 		}
 	}
 
@@ -636,7 +673,8 @@ func autoSaveOutput(content string, sourcePath string) error {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
-	utils.PrintColouredMessage("✅", fmt.Sprintf("Automatically saved to %s", filePath), color.FgGreen)
+	utils.AddMessage("✅", fmt.Sprintf("Automatically saved to %s", filePath), color.FgGreen, 10)
+
 	return nil
 }
 
