@@ -22,6 +22,7 @@ const defaultGlobContent = `
 **/pyenv/**
 **/tmp/**
 **/out/**
+**/target/**
 **/temp/**
 **/conda/**
 **/mamba/**
@@ -102,6 +103,7 @@ const defaultGlobContent = `
 **/*.diff
 **/*.heic
 **/*.hiec
+**/*.mvnw*
 
 # Specific files
 **/.editorconfig
@@ -142,6 +144,7 @@ const defaultGlobContent = `
 **/.gitmodules
 **/.gitpod.yml
 **/.gitlab-ci.yml
+**/.aider*
 `
 
 // GetDefaultExcludes returns a list of default exclude patterns
