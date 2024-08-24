@@ -1,6 +1,6 @@
 module github.com/sammcj/ingest
 
-go 1.22.6
+go 1.23.0
 
 require (
 	github.com/atotto/clipboard v0.1.4
@@ -10,7 +10,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sashabaranov/go-openai v1.28.3
+	github.com/sashabaranov/go-openai v1.29.0
 	github.com/schollz/progressbar/v3 v3.14.6
 	github.com/spf13/cobra v1.8.1
 )
