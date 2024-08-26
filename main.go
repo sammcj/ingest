@@ -211,7 +211,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// If verbose, print active excludes
 	if verbose {
-		activeExcludes, err := filesystem.ReadExcludePatterns(patternExclude)
+		activeExcludes, err := filesystem.ReadExcludePatterns(patternExclude, false)
 		if err != nil {
 			return fmt.Errorf("failed to read exclude patterns: %w", err)
 		}
