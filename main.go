@@ -55,6 +55,7 @@ var (
 	fitsFlag             float64
 	quantTypeFlag        string
 	verbose              bool
+	noDefaultExcludes    bool
 	Version              string // This will be set by the linker at build time
 	rootCmd              *cobra.Command
 )
@@ -102,6 +103,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
 	rootCmd.Flags().BoolP("save", "s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
 	rootCmd.Flags().Bool("config", false, "Open the config file in the default editor")
+	rootCmd.Flags().BoolVar(&noDefaultExcludes, "no-default-excludes", false, "Disable default exclude patterns")
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
@@ -209,7 +211,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// If verbose, print active excludes
 	if verbose {
-		activeExcludes, err := filesystem.ReadExcludePatterns(patternExclude)
+		activeExcludes, err := filesystem.ReadExcludePatterns(patternExclude, false)
 		if err != nil {
 			return fmt.Errorf("failed to read exclude patterns: %w", err)
 		}
@@ -237,7 +239,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 		if fileInfo.IsDir() {
 			// Existing directory processing logic
-			tree, files, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock)
+			tree, files, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes)
 			if err != nil {
 				return fmt.Errorf("failed to process directory %s: %w", path, err)
 			}

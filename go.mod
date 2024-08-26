@@ -1,6 +1,6 @@
 module github.com/sammcj/ingest
 
-go 1.22.6
+go 1.23.0
 
 require (
 	github.com/atotto/clipboard v0.1.4
@@ -10,19 +10,19 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sashabaranov/go-openai v1.28.3
+	github.com/sashabaranov/go-openai v1.29.0
 	github.com/schollz/progressbar/v3 v3.14.6
 	github.com/spf13/cobra v1.8.1
 )
 
-require github.com/sammcj/gollama v1.27.1 // indirect
+require github.com/sammcj/gollama v1.27.3 // indirect
 
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
-	github.com/charmbracelet/lipgloss v0.12.1 // indirect
-	github.com/charmbracelet/x/ansi v0.1.4 // indirect
+	github.com/charmbracelet/lipgloss v0.13.0 // indirect
+	github.com/charmbracelet/x/ansi v0.2.3 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect

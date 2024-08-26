@@ -58,6 +58,8 @@ $ ingest
 [✅] Copied to clipboard successfully.
 ```
 
+The first time ingest runs, it will download a small [tokeniser](https://github.com/pkoukk/tiktoken-go-loader/blob/main/assets/cl100k_base.tiktoken) called 'cl100k_base.tiktoken' this is used for tokenisation.
+
 Generate a prompt from a directory, including only Python files:
 
 ```shell
@@ -220,6 +222,7 @@ These directories will be created automatically on first run, along with README 
 
 - `-i, --include`: Patterns to include (can be used multiple times)
 - `-e, --exclude`: Patterns to exclude (can be used multiple times)
+- `--no-default-excludes`: Disable default exclude patterns
 - `--include-priority`: Include files in case of conflict between include and exclude patterns
 - `--exclude-from-tree`: Exclude files/folders from the source tree based on exclude patterns
 - `--tokens`: Display the token count of the generated prompt
