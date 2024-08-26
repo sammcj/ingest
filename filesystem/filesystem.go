@@ -31,7 +31,7 @@ type treeNode struct {
 	isDir    bool
 }
 
-func ReadExcludePatterns(patternExclude string) ([]string, error) {
+func ReadExcludePatterns(patternExclude string, noDefaultExcludes bool) ([]string, error) {
 	var patterns []string
 
 	// If a specific pattern exclude file is provided, use it
@@ -39,10 +39,13 @@ func ReadExcludePatterns(patternExclude string) ([]string, error) {
 		return readGlobFile(patternExclude)
 	}
 
-	// Get the default excludes
-	defaultPatterns, err := GetDefaultExcludes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to read default exclude patterns: %w", err)
+	if !noDefaultExcludes {
+		// Get the default excludes
+		defaultPatterns, err := GetDefaultExcludes()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read default exclude patterns: %w", err)
+		}
+		patterns = defaultPatterns
 	}
 
 	// Check for user-specific patterns
@@ -59,11 +62,8 @@ func ReadExcludePatterns(patternExclude string) ([]string, error) {
 		// Read other user-defined patterns
 		userPatterns, _ := readGlobFilesFromDir(userPatternsDir)
 
-		// Combine user patterns with default patterns
-		patterns = append(defaultPatterns, userPatterns...)
-	} else {
-		// If we can't access the home directory, just use default patterns
-		patterns = defaultPatterns
+		// Combine user patterns with default patterns (if not disabled)
+		patterns = append(patterns, userPatterns...)
 	}
 
 	return patterns, nil
@@ -110,18 +110,18 @@ func readGlobFilesFromDir(dir string) ([]string, error) {
 	return patterns, err
 }
 
-func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock bool) (string, []FileInfo, error) {
+func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes bool) (string, []FileInfo, error) {
 	var files []FileInfo
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	// Read exclude patterns
-	defaultExcludes, err := ReadExcludePatterns(patternExclude)
+	defaultExcludes, err := ReadExcludePatterns(patternExclude, noDefaultExcludes)
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to read exclude patterns: %w", err)
 	}
 
-	// Combine user-provided exclude patterns with default excludes
+	// Combine user-provided exclude patterns with default excludes (if not disabled)
 	allExcludePatterns := append(excludePatterns, defaultExcludes...)
 
 	// Always exclude .git directories
