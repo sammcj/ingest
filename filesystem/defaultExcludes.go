@@ -104,6 +104,11 @@ const defaultGlobContent = `
 **/*.heic
 **/*.hiec
 **/*.mvnw*
+**/terraform.tfstate.*
+**/.aider*
+**/*.tfgraph
+**/*.terraform.tfstate.lock.info
+**/.terraform/*
 
 # Specific files
 **/.editorconfig
@@ -144,7 +149,15 @@ const defaultGlobContent = `
 **/.gitmodules
 **/.gitpod.yml
 **/.gitlab-ci.yml
-**/.aider*
+**/terraform.rc
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/.terraform.lock.hcl
+**/.terraform.lock.hcl.lock
+**/plan.out
+**/plan
+**/terraform.tfplan
+**/terraform.tfplan.json
 `
 
 // GetDefaultExcludes returns a list of default exclude patterns
