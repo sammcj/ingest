@@ -95,6 +95,8 @@ github.com/sashabaranov/go-openai v1.29.0 h1:eBH6LSjtX4md5ImDCX8hNhHQvaRf22zujiE
 github.com/sashabaranov/go-openai v1.29.0/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/sashabaranov/go-openai v1.29.1 h1:AlB+vwpg1tibwr83OKXLsI4V1rnafVyTlw0BjR+6WUM=
 github.com/sashabaranov/go-openai v1.29.1/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
+github.com/sashabaranov/go-openai v1.29.2 h1:jYpp1wktFoOvxHnum24f/w4+DFzUdJnu83trr5+Slh0=
+github.com/sashabaranov/go-openai v1.29.2/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/schollz/progressbar/v3 v3.14.6 h1:GyjwcWBAf+GFDMLziwerKvpuS7ZF+mNTAXIB2aspiZs=
 github.com/schollz/progressbar/v3 v3.14.6/go.mod h1:Nrzpuw3Nl0srLY0VlTvC4V6RL50pcEymjy6qyJAaLa0=
 github.com/shirou/gopsutil v3.21.11+incompatible h1:+1+c1VGhc88SSonWP6foOcLhvnKlUeu/erjjvaPEYiI=
