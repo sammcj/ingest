@@ -25,9 +25,9 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Optionally save output to a file in ~/ingest
 - Shell completions for Bash, Zsh, and Fish
 
-Ingest Intro (Podcast):
-<audio src="https://github.com/sammcj/smcleod_files/raw/refs/heads/master/audio/podcast-ep-sw/Podcast%20Episode%20-%20Ingest.mp3" controls preload></audio>
+Ingest Intro ("Podcast" Episode):
 
+<audio src="https://github.com/sammcj/smcleod_files/raw/refs/heads/master/audio/podcast-ep-sw/Podcast%20Episode%20-%20Ingest.mp3" controls preload></audio>
 
 ## Installation
 
