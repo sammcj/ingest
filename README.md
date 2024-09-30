@@ -25,6 +25,10 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Optionally save output to a file in ~/ingest
 - Shell completions for Bash, Zsh, and Fish
 
+Ingest Intro (Podcast):
+<audio src="https://github.com/sammcj/smcleod_files/raw/refs/heads/master/audio/podcast-ep-sw/Podcast%20Episode%20-%20Ingest.mp3" controls preload></audio>
+
+
 ## Installation
 
 ### go install (recommended)
@@ -275,3 +279,5 @@ Contributions are welcome, Please feel free to submit a Pull Request.
 ## Acknowledgements
 
 - Initially inspired by [mufeedvh/code2prompt](https://github.com/mufeedvh/code2prompt)
+
+<script src="http://api.html5media.info/1.1.8/html5media.min.js"></script>
