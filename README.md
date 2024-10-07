@@ -39,6 +39,14 @@ Make sure you have Go installed on your system, then run:
 go install github.com/sammcj/ingest@HEAD
 ```
 
+### curl
+
+I don't recommend this method as it's not as easy to update, but you can use the following command:
+
+```shell
+curl -sL https://raw.githubusercontent.com/sammcj/ingest/refs/heads/main/scripts/install.sh | bash
+```
+
 ### Manual install
 
 1. Download the latest release from the [releases page](https://github.com/sammcj/ingest/releases)
