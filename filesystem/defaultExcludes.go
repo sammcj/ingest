@@ -109,6 +109,7 @@ const defaultGlobContent = `
 **/*.tfgraph
 **/*.terraform.tfstate.lock.info
 **/.terraform/*
+**/.webpack/*
 
 # Specific files
 **/.editorconfig
