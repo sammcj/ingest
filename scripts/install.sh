@@ -18,7 +18,7 @@ VER=$(curl --silent -qI https://github.com/sammcj/ingest/releases/latest | awk -
 
 echo "Downloading ingest ${VER} for ${OS}-${ARCH}..."
 
-wget https://github.com/sammcj/ingest/releases/download/$VER/ingest-${OS}-${ARCH} -O ingest
+wget -q --show-progress -O ingest "https://github.com/sammcj/ingest/releases/download/$VER/ingest-${OS}-${ARCH}"
 
 # # Move the binary to the install directory
 mv ingest "${INSTALL_PATH}"
