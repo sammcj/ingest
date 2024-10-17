@@ -10,12 +10,12 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sashabaranov/go-openai v1.32.0
+	github.com/sashabaranov/go-openai v1.32.2
 	github.com/schollz/progressbar/v3 v3.16.1
 	github.com/spf13/cobra v1.8.1
 )
 
-require github.com/sammcj/gollama v1.27.12 // indirect
+require github.com/sammcj/gollama v1.27.13 // indirect
 
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
@@ -43,7 +43,7 @@ require (
 	github.com/sammcj/quantest v0.0.10
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/yuin/goldmark v1.7.6 // indirect
+	github.com/yuin/goldmark v1.7.8 // indirect
 	github.com/yuin/goldmark-emoji v1.0.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/net v0.30.0 // indirect
