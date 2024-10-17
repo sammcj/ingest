@@ -170,7 +170,15 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 				return err
 			}
 
-			if shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) && !info.IsDir() {
+			// Check if the current path (file or directory) should be excluded
+			if shouldExcludePath(relPath, allExcludePatterns, gitignore) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+
+			if !info.IsDir() && shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) {
 				wg.Add(1)
 				go func(path, relPath string, info os.FileInfo) {
 					defer wg.Done()
@@ -189,6 +197,16 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 	}
 
 	return treeString, files, nil
+}
+
+// New helper function to check if a path should be excluded
+func shouldExcludePath(path string, excludePatterns []string, gitignore *ignore.GitIgnore) bool {
+	for _, pattern := range excludePatterns {
+		if match, _ := doublestar.Match(pattern, path); match {
+			return true
+		}
+	}
+	return gitignore != nil && gitignore.MatchesPath(path)
 }
 
 func shouldIncludeFile(path string, includePatterns, excludePatterns []string, gitignore *ignore.GitIgnore, includePriority bool) bool {
