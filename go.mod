@@ -1,6 +1,6 @@
 module github.com/sammcj/ingest
 
-go 1.22.7
+go 1.22.8
 
 require (
 	github.com/atotto/clipboard v0.1.4
