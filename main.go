@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,6 +21,7 @@ import (
 	"github.com/sammcj/ingest/template"
 	"github.com/sammcj/ingest/token"
 	"github.com/sammcj/ingest/utils"
+	"github.com/sammcj/ingest/web"
 	"github.com/sammcj/quantest"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/spf13/cobra"
@@ -58,6 +60,11 @@ var (
 	noDefaultExcludes    bool
 	Version              string // This will be set by the linker at build time
 	rootCmd              *cobra.Command
+	webCrawl             bool
+	webMaxDepth          int
+	webAllowedDomains    []string
+	webTimeout           int
+	webConcurrentJobs    int
 )
 
 type GitData struct {
@@ -104,6 +111,13 @@ func init() {
 	rootCmd.Flags().BoolP("save", "s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
 	rootCmd.Flags().Bool("config", false, "Open the config file in the default editor")
 	rootCmd.Flags().BoolVar(&noDefaultExcludes, "no-default-excludes", false, "Disable default exclude patterns")
+
+	// Web Crawler flags
+	rootCmd.Flags().BoolVar(&webCrawl, "web", false, "Enable web crawling mode")
+	rootCmd.Flags().IntVar(&webMaxDepth, "web-depth", 1, "Maximum crawling depth for web pages")
+	rootCmd.Flags().StringSliceVar(&webAllowedDomains, "web-domains", nil, "Allowed domains for web crawling")
+	rootCmd.Flags().IntVar(&webTimeout, "web-timeout", 120, "Timeout in seconds for web requests")
+	rootCmd.Flags().IntVar(&webConcurrentJobs, "web-concurrent", 6, "Number of concurrent crawling jobs")
 
 	// VRAM estimation flags
 	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
@@ -223,15 +237,40 @@ func run(cmd *cobra.Command, args []string) error {
 	var allTrees []string
 	var gitData []GitData
 
-	for _, path := range args {
-		absPath, err := filepath.Abs(path)
+	remainingArgs := make([]string, len(args))
+	copy(remainingArgs, args)
+
+	for i := 0; i < len(remainingArgs); i++ {
+		arg := remainingArgs[i]
+
+		// Check if this is a URL (either with --web flag or auto-detected)
+		if webCrawl || isURL(arg) {
+			if !isURL(arg) {
+				return fmt.Errorf("web crawling is enabled but the argument '%s' is not a URL", arg)
+			}
+
+			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Processing URL: %s", arg), color.FgBlue)
+
+			// Process as web URL - now passing excludePatterns
+			result, err := processWebInput(arg, excludePatterns)
+			if err != nil {
+				return fmt.Errorf("failed to process web URL %s: %w", arg, err)
+			}
+
+			allFiles = append(allFiles, result.Files...)
+			allTrees = append(allTrees, result.TreeString)
+			continue
+		}
+
+		// Process as local file/directory
+		absPath, err := filepath.Abs(arg)
 		if err != nil {
-			return fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+			return fmt.Errorf("failed to get absolute path for %s: %w", arg, err)
 		}
 
 		fileInfo, err := os.Stat(absPath)
 		if err != nil {
-			return fmt.Errorf("failed to get file info for %s: %w", path, err)
+			return fmt.Errorf("failed to get file info for %s: %w", arg, err)
 		}
 
 		var files []filesystem.FileInfo
@@ -241,14 +280,14 @@ func run(cmd *cobra.Command, args []string) error {
 			// Existing directory processing logic
 			tree, files, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes)
 			if err != nil {
-				return fmt.Errorf("failed to process directory %s: %w", path, err)
+				return fmt.Errorf("failed to process directory %s: %w", arg, err)
 			}
 			tree = fmt.Sprintf("%s:\n%s", absPath, tree)
 		} else {
 			// New file processing logic
 			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock)
 			if err != nil {
-				return fmt.Errorf("failed to process file %s: %w", path, err)
+				return fmt.Errorf("failed to process file %s: %w", arg, err)
 			}
 			files = []filesystem.FileInfo{file}
 			tree = fmt.Sprintf("File: %s", absPath)
@@ -709,4 +748,20 @@ func runCompletion(cmd *cobra.Command, args []string) {
 			fmt.Printf("Error generating fish completion: %v\n", err)
 		}
 	}
+}
+
+func processWebInput(urlStr string, excludePatterns []string) (*web.CrawlResult, error) {
+	options := web.CrawlOptions{
+		MaxDepth:       webMaxDepth,
+		AllowedDomains: webAllowedDomains,
+		Timeout:        webTimeout,
+		ConcurrentJobs: webConcurrentJobs,
+	}
+
+	return web.ProcessWebURL(urlStr, options, excludePatterns)
+}
+
+func isURL(str string) bool {
+	u, err := url.Parse(str)
+	return err == nil && u.Scheme != "" && u.Host != ""
 }

@@ -1,8 +1,11 @@
 module github.com/sammcj/ingest
 
-go 1.22.8
+go 1.23
+
+toolchain go1.23.2
 
 require (
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/bmatcuk/doublestar/v4 v4.7.1
 	github.com/charmbracelet/glamour v0.8.0
@@ -15,7 +18,10 @@ require (
 	github.com/spf13/cobra v1.8.1
 )
 
-require github.com/sammcj/gollama v1.27.14 // indirect
+require (
+	github.com/andybalholm/cascadia v1.3.2 // indirect
+	github.com/sammcj/gollama v1.27.14 // indirect
+)
 
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
@@ -43,7 +49,7 @@ require (
 	github.com/sammcj/quantest v0.0.10
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/yuin/goldmark v1.7.8 // indirect
+	github.com/yuin/goldmark v1.7.8
 	github.com/yuin/goldmark-emoji v1.0.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/net v0.30.0 // indirect
