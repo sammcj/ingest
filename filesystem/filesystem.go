@@ -140,6 +140,28 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 		return "", nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
+	// Check if rootPath is a single PDF file
+	if !fileInfo.IsDir() {
+		isPDF, err := pdf.IsPDF(rootPath)
+		if err != nil {
+			return "", nil, fmt.Errorf("failed to check if file is PDF: %w", err)
+		}
+
+		if isPDF {
+			// Process single PDF file directly
+			content, err := pdf.ConvertPDFToMarkdown(rootPath, false)
+			if err != nil {
+				return "", nil, fmt.Errorf("failed to convert PDF: %w", err)
+			}
+
+			return fmt.Sprintf("File: %s", rootPath), []FileInfo{{
+				Path:      rootPath,
+				Extension: ".md",
+				Code:      content,
+			}}, nil
+		}
+	}
+
 	var treeString string
 
 	if !fileInfo.IsDir() {
@@ -257,6 +279,15 @@ func wrapCodeBlock(code, extension string) string {
 }
 
 func isBinaryFile(filePath string) (bool, error) {
+	// First check if it's a PDF
+	isPDF, err := pdf.IsPDF(filePath)
+	if err != nil {
+		return false, err
+	}
+	if isPDF {
+		return false, nil // Don't treat PDFs as binary files
+	}
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return false, err
@@ -273,8 +304,8 @@ func isBinaryFile(filePath string) (bool, error) {
 	// Use http.DetectContentType to determine the content type
 	contentType := http.DetectContentType(buffer[:n])
 
-	// Check if the content type starts with "text/"
-	return !strings.HasPrefix(contentType, "text/"), nil
+	// Allow PDFs and text files
+	return !strings.HasPrefix(contentType, "text/") && contentType != "application/pdf", nil
 }
 
 func PrintDefaultExcludes() {
@@ -287,6 +318,9 @@ func PrintDefaultExcludes() {
 }
 
 func processFile(path, relPath string, rootPath string, lineNumber, relativePaths, noCodeblock bool, mu *sync.Mutex, files *[]FileInfo) {
+	// Check if it's the root path being processed (explicitly provided file)
+	isExplicitFile := path == rootPath
+
 	// Check if file is a PDF
 	isPDF, err := pdf.IsPDF(path)
 	if err != nil {
@@ -295,6 +329,12 @@ func processFile(path, relPath string, rootPath string, lineNumber, relativePath
 	}
 
 	if isPDF {
+		if !isExplicitFile {
+			// Skip PDFs during directory traversal
+			return
+		}
+
+		utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Converting PDF to markdown: %s", path), color.FgBlue)
 		content, err := pdf.ConvertPDFToMarkdown(path, false)
 		if err != nil {
 			utils.PrintColouredMessage("!", fmt.Sprintf("Failed to convert PDF %s: %v", path, err), color.FgRed)
@@ -456,9 +496,29 @@ func isExcluded(path string, patterns []string) bool {
 }
 
 func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool) (FileInfo, error) {
+	// Check if it's a PDF first
+	isPDF, err := pdf.IsPDF(path)
+	if err != nil {
+		return FileInfo{}, fmt.Errorf("failed to check if file is PDF: %w", err)
+	}
+
+	if isPDF {
+		content, err := pdf.ConvertPDFToMarkdown(path, false)
+		if err != nil {
+			return FileInfo{}, fmt.Errorf("failed to convert PDF: %w", err)
+		}
+
+		return FileInfo{
+			Path:      path,
+			Extension: ".md",
+			Code:      content,
+		}, nil
+	}
+
+	// Handle non-PDF files
 	content, err := os.ReadFile(path)
 	if err != nil {
-		return FileInfo{}, fmt.Errorf("failed to read file %s: %w", path, err)
+		return FileInfo{}, fmt.Errorf("failed to read file: %w", err)
 	}
 
 	code := string(content)

@@ -21,33 +21,33 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 	// Check if URL points to a PDF
 	isPDF, err := pdf.IsPDF(urlStr)
 	if err != nil {
-			return nil, fmt.Errorf("error checking PDF: %w", err)
+		return nil, fmt.Errorf("error checking PDF: %w", err)
 	}
 
 	if isPDF {
-			content, err := pdf.ConvertPDFToMarkdown(urlStr, true)
-			if err != nil {
-					return nil, fmt.Errorf("error converting PDF: %w", err)
-			}
+		content, err := pdf.ConvertPDFToMarkdown(urlStr, true)
+		if err != nil {
+			return nil, fmt.Errorf("error converting PDF: %w", err)
+		}
 
-			return &CrawlResult{
-					TreeString: fmt.Sprintf("PDF Document: %s", urlStr),
-					Files: []filesystem.FileInfo{{
-							Path:      urlStr,
-							Extension: ".md",
-							Code:      content,
-					}},
-			}, nil
+		return &CrawlResult{
+			TreeString: fmt.Sprintf("PDF Document: %s", urlStr),
+			Files: []filesystem.FileInfo{{
+				Path:      urlStr,
+				Extension: ".md",
+				Code:      content,
+			}},
+		}, nil
 	}
 
 	// Validate URL
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-			return nil, fmt.Errorf("invalid URL: %w", err)
+		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
 
 	if !strings.HasPrefix(parsedURL.Scheme, "http") {
-			return nil, fmt.Errorf("URL must start with http:// or https://")
+		return nil, fmt.Errorf("URL must start with http:// or https://")
 	}
 
 	// Initialize crawler with the start URL
@@ -57,7 +57,7 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 	// Perform crawl
 	pages, err := crawler.Crawl(urlStr)
 	if err != nil {
-			return nil, fmt.Errorf("crawl failed: %w", err)
+		return nil, fmt.Errorf("crawl failed: %w", err)
 	}
 
 	// Convert crawled pages to FileInfo format

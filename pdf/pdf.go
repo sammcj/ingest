@@ -3,7 +3,6 @@
 package pdf
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 )
 
 // ConvertPDFToMarkdown converts a PDF file to markdown format
+
 func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 	var reader io.ReadCloser
 	var err error
@@ -26,7 +26,6 @@ func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 		}
 		defer reader.Close()
 
-		// Create a temporary file to store the PDF
 		tempFile, err := os.CreateTemp("", "ingest-*.pdf")
 		if err != nil {
 			return "", fmt.Errorf("failed to create temp file: %w", err)
@@ -34,7 +33,6 @@ func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 		defer os.Remove(tempFile.Name())
 		defer tempFile.Close()
 
-		// Copy the downloaded PDF to the temp file
 		if _, err := io.Copy(tempFile, reader); err != nil {
 			return "", fmt.Errorf("failed to save PDF: %w", err)
 		}
@@ -42,17 +40,17 @@ func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 		path = tempFile.Name()
 	}
 
-	// Open the PDF file
+	// Open and read the PDF
 	f, r, err := pdf.Open(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to open PDF: %w", err)
 	}
 	defer f.Close()
 
-	var buf bytes.Buffer
+	var buf strings.Builder
 	buf.WriteString(fmt.Sprintf("# PDF Content: %s\n\n", filepath.Base(path)))
 
-	// Read each page
+	// Extract text from each page
 	totalPages := r.NumPage()
 	for pageNum := 1; pageNum <= totalPages; pageNum++ {
 		page := r.Page(pageNum)
@@ -65,13 +63,21 @@ func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 			return "", fmt.Errorf("failed to extract text from page %d: %w", pageNum, err)
 		}
 
-		// Add page header and content
-		buf.WriteString(fmt.Sprintf("## Page %d\n\n", pageNum))
-		buf.WriteString(cleanText(text))
-		buf.WriteString("\n\n")
+		// Clean and process the text
+		cleanedText := cleanText(text)
+		if cleanedText != "" {
+			buf.WriteString(fmt.Sprintf("## Page %d\n\n", pageNum))
+			buf.WriteString(cleanedText)
+			buf.WriteString("\n\n")
+		}
 	}
 
-	return buf.String(), nil
+	result := buf.String()
+	if strings.TrimSpace(result) == strings.TrimSpace(fmt.Sprintf("# PDF Content: %s\n\n", filepath.Base(path))) {
+		return "", fmt.Errorf("no text content could be extracted from PDF")
+	}
+
+	return result, nil
 }
 
 // IsPDF checks if a file is a PDF based on its content type or extension
@@ -80,7 +86,7 @@ func IsPDF(path string) (bool, error) {
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		resp, err := http.Head(path)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("failed to check URL for PDF: %w", err)
 		}
 		defer resp.Body.Close()
 		return resp.Header.Get("Content-Type") == "application/pdf", nil
@@ -89,19 +95,19 @@ func IsPDF(path string) (bool, error) {
 	// Check local file
 	file, err := os.Open(path)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
 	// Read first 512 bytes to determine file type
 	buffer := make([]byte, 512)
-	_, err = file.Read(buffer)
+	n, err := file.Read(buffer)
 	if err != nil && err != io.EOF {
-		return false, err
+		return false, fmt.Errorf("failed to read file header: %w", err)
 	}
 
 	// Check file signature
-	contentType := http.DetectContentType(buffer)
+	contentType := http.DetectContentType(buffer[:n])
 	if contentType == "application/pdf" {
 		return true, nil
 	}
@@ -130,19 +136,37 @@ func downloadPDF(url string) (io.ReadCloser, error) {
 }
 
 func cleanText(text string) string {
-	// Remove excessive whitespace
-	text = strings.ReplaceAll(text, "\r", "")
-	text = strings.TrimSpace(text)
+	if strings.Contains(text, "%PDF-") || strings.Contains(text, "endobj") {
+		// This appears to be raw PDF data rather than extracted text
+		return ""
+	}
 
-	// Normalize line endings
+	// Remove control characters except newlines and tabs
+	text = strings.Map(func(r rune) rune {
+		if r < 32 && r != '\n' && r != '\t' {
+			return -1
+		}
+		return r
+	}, text)
+
+	// Split into lines and clean each line
 	lines := strings.Split(text, "\n")
 	var cleanLines []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line != "" {
-			cleanLines = append(cleanLines, line)
+
+		// Skip empty lines and lines that look like PDF syntax
+		if line == "" ||
+			strings.HasPrefix(line, "%") ||
+			strings.HasPrefix(line, "/") ||
+			strings.Contains(line, "obj") ||
+			strings.Contains(line, "endobj") ||
+			strings.Contains(line, "stream") {
+			continue
 		}
+
+		cleanLines = append(cleanLines, line)
 	}
 
 	return strings.Join(cleanLines, "\n\n")
