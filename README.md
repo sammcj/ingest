@@ -10,6 +10,10 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 
 ![ingest with --llm](screenshot.png)
 
+And ingest web URLs.
+
+![ingest with --web](screenshot3.png)
+
 ## Features
 
 - Traverse directory structures and generate a tree view
@@ -202,7 +206,7 @@ You can provide a prompt suffix to append to the generated prompt:
 ingest --llm -p "explain this code" /path/to/project
 ```
 
-## Web Crawling
+## Web Crawling & Ingestion
 
 Crawl with explicit web mode
 
