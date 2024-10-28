@@ -39,10 +39,20 @@ type Crawler struct {
 	options         CrawlOptions
 	converter       *md.Converter
 	excludePatterns []string
+	initialPath     string    // Store the initial URL path
+	singlePageMode  bool      // True if crawling a specific page
 }
 
-func NewCrawler(options CrawlOptions) *Crawler {
-	// Create a new converter with GitHub Flavoured Markdown support
+func NewCrawler(options CrawlOptions, startURL string) *Crawler {
+	parsedURL, err := url.Parse(startURL)
+	initialPath := "/"
+	singlePageMode := false
+
+	if err == nil && parsedURL.Path != "" && parsedURL.Path != "/" {
+		initialPath = strings.TrimSuffix(parsedURL.Path, "/")
+		singlePageMode = true
+	}
+	// Create a new converter with GitHub Flavored Markdown support
 	converter := md.NewConverter("", true, &md.Options{
 		// Configure the converter to handle common edge cases
 		StrongDelimiter: "**",
@@ -51,6 +61,7 @@ func NewCrawler(options CrawlOptions) *Crawler {
 		HeadingStyle:    "atx",
 		HorizontalRule: "---",
 		CodeBlockStyle: "fenced",
+		BulletListMarker: "-",
 	})
 
 	// Use GitHub Flavored Markdown plugins
@@ -61,9 +72,11 @@ func NewCrawler(options CrawlOptions) *Crawler {
 	converter.Remove("script", "style", "iframe", "noscript") // Remove unwanted elements
 
 	return &Crawler{
-		visited:   make(map[string]bool),
-		options:   options,
-		converter: converter,
+		visited:        make(map[string]bool),
+		options:        options,
+		converter:      converter,
+		initialPath:    initialPath,
+		singlePageMode: singlePageMode,
 	}
 }
 
@@ -201,21 +214,33 @@ func (c *Crawler) resolveURL(base *url.URL, ref string) string {
 }
 
 func (c *Crawler) isAllowed(urlStr string) bool {
-	if len(c.options.AllowedDomains) == 0 {
-		return true
-	}
-
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
 		return false
 	}
 
-	for _, domain := range c.options.AllowedDomains {
-		if strings.Contains(parsedURL.Host, domain) {
-			return true
+	// Check domain restrictions if any
+	if len(c.options.AllowedDomains) > 0 {
+		domainAllowed := false
+		for _, domain := range c.options.AllowedDomains {
+			if strings.Contains(parsedURL.Host, domain) {
+				domainAllowed = true
+				break
+			}
+		}
+		if !domainAllowed {
+			return false
 		}
 	}
-	return false
+
+	// If we're in single page mode, only allow the exact same path
+	if c.singlePageMode {
+		currentPath := strings.TrimSuffix(parsedURL.Path, "/")
+		// Only allow the exact same path or same path with a fragment
+		return currentPath == c.initialPath
+	}
+
+	return true
 }
 
 func (c *Crawler) Crawl(startURL string) ([]*WebPage, error) {

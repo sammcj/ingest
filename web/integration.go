@@ -27,8 +27,8 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 		return nil, fmt.Errorf("URL must start with http:// or https://")
 	}
 
-	// Initialize crawler
-	crawler := NewCrawler(options)
+	// Initialize crawler with the start URL
+	crawler := NewCrawler(options, urlStr)
 	crawler.SetExcludePatterns(excludePatterns)
 
 	// Perform crawl
@@ -52,8 +52,30 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 		})
 	}
 
-	// Generate tree representation
-	treeString := generateWebTree(pages)
+	// Generate tree representation, but only if we have more than one page
+	var treeString string
+	if len(files) > 1 {
+		treeString = generateWebTree(pages)
+	} else if len(files) == 1 {
+		treeString = fmt.Sprintf("Web Page: %s", files[0].Path)
+	}
+
+	// If we're crawling a specific page, only return that page's content
+	if parsedURL.Path != "/" && parsedURL.Path != "" {
+		for _, file := range files {
+			fileURL, err := url.Parse(file.Path)
+			if err != nil {
+				continue
+			}
+			// Find the exact matching path (ignoring trailing slashes)
+			if strings.TrimSuffix(fileURL.Path, "/") == strings.TrimSuffix(parsedURL.Path, "/") {
+				return &CrawlResult{
+					TreeString: fmt.Sprintf("Web Page: %s", file.Path),
+					Files:      []filesystem.FileInfo{file},
+				}, nil
+			}
+		}
+	}
 
 	return &CrawlResult{
 		TreeString: treeString,
