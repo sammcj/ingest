@@ -446,6 +446,9 @@ func printTree(node *treeNode, prefix string, isLast bool, output *strings.Build
 func isExcluded(path string, patterns []string) bool {
 	for _, pattern := range patterns {
 		if match, _ := doublestar.Match(pattern, path); match {
+			if strings.HasSuffix(path, ".pdf") {
+				utils.PrintColouredMessage("ℹ️", fmt.Sprintf("PDF file detected: %s. PDF to markdown conversion is supported, but the file was excluded", path), color.FgYellow)
+			}
 			return true
 		}
 	}
