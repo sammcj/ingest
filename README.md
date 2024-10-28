@@ -29,6 +29,7 @@ And ingest web URLs.
 - Optionally save output to a file in ~/ingest
 - Shell completions for Bash, Zsh, and Fish
 - Web crawling to ingest web pages as Markdown
+- PDF to markdown conversion and ingestion
 
 Ingest Intro ("Podcast" Episode):
 
