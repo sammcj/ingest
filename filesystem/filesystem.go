@@ -16,6 +16,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/mitchellh/go-homedir"
 	ignore "github.com/sabhiram/go-gitignore"
+	"github.com/sammcj/ingest/pdf"
 	"github.com/sammcj/ingest/utils"
 )
 
@@ -286,6 +287,35 @@ func PrintDefaultExcludes() {
 }
 
 func processFile(path, relPath string, rootPath string, lineNumber, relativePaths, noCodeblock bool, mu *sync.Mutex, files *[]FileInfo) {
+	// Check if file is a PDF
+	isPDF, err := pdf.IsPDF(path)
+	if err != nil {
+		utils.PrintColouredMessage("!", fmt.Sprintf("Failed to check if file is PDF %s: %v", path, err), color.FgRed)
+		return
+	}
+
+	if isPDF {
+		content, err := pdf.ConvertPDFToMarkdown(path, false)
+		if err != nil {
+			utils.PrintColouredMessage("!", fmt.Sprintf("Failed to convert PDF %s: %v", path, err), color.FgRed)
+			return
+		}
+
+		filePath := path
+		if relativePaths {
+			filePath = filepath.Join(filepath.Base(rootPath), relPath)
+		}
+
+		mu.Lock()
+		*files = append(*files, FileInfo{
+			Path:      filePath,
+			Extension: ".md",
+			Code:      content,
+		})
+		mu.Unlock()
+		return
+	}
+
 	// Check if the file is binary
 	isBinary, err := isBinaryFile(path)
 	if err != nil {
