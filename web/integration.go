@@ -1,5 +1,4 @@
 // web/integration.go
-// Package web provides web crawling functionality for the ingest tool.
 
 package web
 
@@ -28,7 +27,7 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 		return nil, fmt.Errorf("URL must start with http:// or https://")
 	}
 
-	// Initialise crawler
+	// Initialize crawler
 	crawler := NewCrawler(options)
 	crawler.SetExcludePatterns(excludePatterns)
 
@@ -41,15 +40,15 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 	// Convert crawled pages to FileInfo format
 	var files []filesystem.FileInfo
 	for _, page := range pages {
+		// Skip pages with no content or error status codes
+		if page.StatusCode != 200 || page.Content == "" {
+			continue
+		}
+
 		files = append(files, filesystem.FileInfo{
 			Path:      page.URL,
 			Extension: ".md",
-			Code: fmt.Sprintf("# %s\n\n%s\n\nOriginal URL: %s\nDepth: %d\n",
-				page.Title,
-				page.Content,
-				page.URL,
-				page.Depth,
-			),
+			Code:      page.Content,
 		})
 	}
 
@@ -69,10 +68,12 @@ func generateWebTree(pages []*WebPage) string {
 	// Create a map of depth to pages
 	depthMap := make(map[int][]*WebPage)
 	for _, page := range pages {
-		depthMap[page.Depth] = append(depthMap[page.Depth], page)
+		if page.StatusCode == 200 && page.Content != "" {
+			depthMap[page.Depth] = append(depthMap[page.Depth], page)
+		}
 	}
 
-	// Build the tree structure
+	// Build the tree structure with indentation
 	for depth := 0; depth <= len(depthMap); depth++ {
 		if pages, ok := depthMap[depth]; ok {
 			for _, page := range pages {
