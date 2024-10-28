@@ -1,8 +1,12 @@
 module github.com/sammcj/ingest
 
-go 1.22.8
+go 1.23
+
+toolchain go1.23.2
 
 require (
+	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/bmatcuk/doublestar/v4 v4.7.1
 	github.com/charmbracelet/glamour v0.8.0
@@ -15,7 +19,11 @@ require (
 	github.com/spf13/cobra v1.8.1
 )
 
-require github.com/sammcj/gollama v1.27.14 // indirect
+require (
+	github.com/andybalholm/cascadia v1.3.2 // indirect
+	github.com/sammcj/gollama v1.27.14 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
+)
 
 require (
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect

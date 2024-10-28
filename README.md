@@ -24,6 +24,7 @@ Ingest can also pass the prompt directly to an LLM such as Ollama for processing
 - Optional JSON output
 - Optionally save output to a file in ~/ingest
 - Shell completions for Bash, Zsh, and Fish
+- Web crawling to ingest web pages as Markdown
 
 Ingest Intro ("Podcast" Episode):
 
@@ -201,6 +202,38 @@ You can provide a prompt suffix to append to the generated prompt:
 ingest --llm -p "explain this code" /path/to/project
 ```
 
+## Web Crawling
+
+Crawl with explicit web mode
+
+```shell
+ingest --web https://example.com
+```
+
+Auto-detect URL and crawl
+
+```shell
+ingest https://example.com
+```
+
+Crawl with domain restriction
+
+```shell
+ingest --web --web-domains example.com https://example.com
+```
+
+Crawl deeper with more concurrency
+
+```shell
+ingest --web --web-depth 3 --web-concurrent 10 https://example.com
+```
+
+Exclude a path from the crawl
+
+```shell
+ingest --web https://example.com -e '/posts/**'
+```
+
 ## Shell Completions
 
 Ingest includes shell completions for Bash, Zsh, and Fish.
@@ -232,31 +265,43 @@ These directories will be created automatically on first run, along with README 
 
 ### Flags
 
-- `-i, --include`: Patterns to include (can be used multiple times)
-- `-e, --exclude`: Patterns to exclude (can be used multiple times)
-- `--no-default-excludes`: Disable default exclude patterns
-- `--include-priority`: Include files in case of conflict between include and exclude patterns
+- `--config`: Opens the config file in the default editor
+- `--context`: Specify the context length for VRAM estimation
 - `--exclude-from-tree`: Exclude files/folders from the source tree based on exclude patterns
-- `--tokens`: Display the token count of the generated prompt
-- `-c, --encoding`: Optional tokeniser to use for token count
-- `-o, --output`: Optional output file path
-- `--llm`: Send the generated prompt to an OpenAI compatible LLM server (such as Ollama) for processing
-- `-p, --prompt`: Optional prompt suffix to append to the generated prompt
-- `-d, --diff`: Include git diff
 - `--git-diff-branch`: Generate git diff between two branches
 - `--git-log-branch`: Retrieve git log between two branches
-- `-l, --line-number`: Add line numbers to the source code
-- `--no-codeblock`: Disable wrapping code inside markdown code blocks
-- `--relative-paths`: Use relative paths instead of absolute paths
-- `-n, --no-clipboard`: Disable copying to clipboard
-- `-t, --template`: Path to a custom Handlebars template
+- `--include-priority`: Include files in case of conflict between include and exclude patterns
 - `--json`: Print output as JSON
+- `--kvcache`: Specify the KV cache quantisation
+- `--llm`: Send the generated prompt to an OpenAI compatible LLM server (such as Ollama) for processing
+- `--memory`: Specify the available memory in GB for context calculation
+- `--model`: Specify the model ID for VRAM estimation
+- `--no-codeblock`: Disable wrapping code inside markdown code blocks
+- `--no-default-excludes`: Disable default exclude patterns
 - `--pattern-exclude`: Path to a specific .glob file for exclude patterns
 - `--print-default-excludes`: Print the default exclude patterns
 - `--print-default-template`: Print the default template
+- `--quant`: Specify the quantisation type or bits per weight
+- `--quanttype`: Specify the quantisation type (gguf or exl2)
+- `--relative-paths`: Use relative paths instead of absolute paths
 - `--report`: Print the largest parsed files
-- `--config`: Opens the config file in the default editor
+- `--save`: Save output to ~/ingest/<directory_name>.md
+- `--tokens`: Display the token count of the generated prompt
 - `--verbose`: Print verbose output
+- `--vram`: Estimate VRAM usage and check model compatibility
+- `--web-concurrent`: Maximum concurrent requests for web crawling
+- `--web-depth`: Maximum depth for web crawling
+- `--web-domains`: Comma-separated list of domains to restrict web crawling
+- `--web`: Crawl a web page
+- `-c, --encoding`: Optional tokeniser to use for token count
+- `-d, --diff`: Include git diff
+- `-e, --exclude`: Patterns to exclude (can be used multiple times)
+- `-i, --include`: Patterns to include (can be used multiple times)
+- `-l, --line-number`: Add line numbers to the source code
+- `-n, --no-clipboard`: Disable copying to clipboard
+- `-o, --output`: Optional output file path
+- `-p, --prompt`: Optional prompt suffix to append to the generated prompt
+- `-t, --template`: Path to a custom Handlebars template
 - `-V, --version`: Print the version number (WIP - still trying to get this to work nicely)
 
 ### Excludes
