@@ -27,7 +27,7 @@ func ProcessWebURL(urlStr string, options CrawlOptions, excludePatterns []string
 		return nil, fmt.Errorf("URL must start with http:// or https://")
 	}
 
-	// Initialize crawler with the start URL
+	// Initialise crawler with the start URL
 	crawler := NewCrawler(options, urlStr)
 	crawler.SetExcludePatterns(excludePatterns)
 
