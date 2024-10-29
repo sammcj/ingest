@@ -1,8 +1,6 @@
 module github.com/sammcj/ingest
 
-go 1.23
-
-toolchain go1.23.2
+go 1.23.2
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown v1.6.0
@@ -15,7 +13,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sashabaranov/go-openai v1.32.3
+	github.com/sashabaranov/go-openai v1.32.5
 	github.com/schollz/progressbar/v3 v3.17.0
 	github.com/spf13/cobra v1.8.1
 )
