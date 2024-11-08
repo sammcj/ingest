@@ -1,6 +1,6 @@
 module github.com/sammcj/ingest
 
-go 1.23.2
+go 1.23.3
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown v1.6.0
