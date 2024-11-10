@@ -1,8 +1,10 @@
 # Ingest
 
-Ingest is a tool I've written to make my life easier when preparing content for LLMs.
+![](./ingest-logo-400.png)
 
-It parses directories of plain text files, such as source code, into a single markdown file suitable for ingestion by AI/LLMs.
+Ingest parses directories of plain text files, such as source code, into a single markdown file suitable for ingestion by AI/LLMs.
+
+---
 
 ![ingest](screenshot2.png)
 
