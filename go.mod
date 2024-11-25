@@ -4,6 +4,7 @@ go 1.23.3
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.2.1
 	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/bmatcuk/doublestar/v4 v4.7.1
