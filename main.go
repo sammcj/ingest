@@ -398,9 +398,9 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		return len(files[i].Code) > len(files[j].Code)
 	})
 
-	// fmt.Println("Top 10 largest files (by estimated token count):")
+	// fmt.Println("Top 15 largest files (by estimated token count):")
 	// print this in colour
-	utils.PrintColouredMessage("ℹ️", "Top 10 largest files (by estimated token count):", color.FgCyan)
+	utils.PrintColouredMessage("ℹ️", "Top 15 largest files (by estimated token count):", color.FgCyan)
 	colourRange := []*color.Color{
 		color.New(color.FgRed),
 		color.New(color.FgRed),
@@ -412,6 +412,11 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		color.New(color.FgYellow),
 		color.New(color.FgYellow),
 		color.New(color.FgYellow),
+		color.New(color.FgGreen),
+		color.New(color.FgGreen),
+		color.New(color.FgGreen),
+		color.New(color.FgGreen),
+		color.New(color.FgGreen),
 	}
 
 	// print the files
@@ -420,8 +425,8 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		// get the colour
 		colour := colourRange[i]
 		fmt.Printf("- %d. %s (%s tokens)\n", i+1, file.Path, colour.Sprint(utils.FormatNumber(tokenCount)))
-		// break after 10
-		if i == 9 {
+		// break after 14
+		if i == 14 {
 			break
 		}
 	}
