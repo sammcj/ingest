@@ -20,7 +20,7 @@ require (
 
 require (
 	github.com/andybalholm/cascadia v1.3.2 // indirect
-	github.com/sammcj/gollama v1.27.18 // indirect
+	github.com/sammcj/gollama v1.27.20 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
@@ -29,7 +29,7 @@ require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/charmbracelet/lipgloss v1.0.0 // indirect
-	github.com/charmbracelet/x/ansi v0.4.5 // indirect
+	github.com/charmbracelet/x/ansi v0.5.2 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect

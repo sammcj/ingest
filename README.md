@@ -164,7 +164,7 @@ ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 8 --quant 
 [ℹ️] 14,702 Tokens (Approximate)
 [ℹ️] Maximum context for 8.00 GB of memory: 10240
 [✅] Generated content (14,702 tokens) fits within maximum context.
-Top 5 largest files (by estimated token count):
+Top 15 largest files (by estimated token count):
 1. /Users/samm/git/sammcj/ingest/main.go (4,682 tokens)
 2. /Users/samm/git/sammcj/ingest/filesystem/filesystem.go (2,694 tokens)
 3. /Users/samm/git/sammcj/ingest/README.md (1,895 tokens)
