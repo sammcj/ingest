@@ -17,6 +17,7 @@ const defaultGlobContent = `
 **/.vscode/**
 **/build/**
 **/coverage/**
+**/.cargo/**
 **/.venv/**
 **/venv/**
 **/pyenv/**
@@ -159,6 +160,10 @@ const defaultGlobContent = `
 **/plan
 **/terraform.tfplan
 **/terraform.tfplan.json
+**/CODE_OF_CONDUCT.md
+**/SUPPORT.md
+**/.pre-commit-config.yaml
+**/.pre-commit-config.yml
 `
 
 // GetDefaultExcludes returns a list of default exclude patterns
