@@ -111,6 +111,7 @@ const defaultGlobContent = `
 **/*.terraform.tfstate.lock.info
 **/.terraform/*
 **/.webpack/*
+**/vendor/*
 
 # Specific files
 **/.editorconfig
