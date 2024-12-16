@@ -57,12 +57,32 @@ func getDefaultTemplate() (string, error) {
 	return readEmbeddedTemplate()
 }
 
-
 func readEmbeddedTemplate() (string, error) {
 	return `
 Source Trees:
 
 {{.source_trees}}
+
+{{if .excluded}}
+Excluded Content:
+{{if le .excluded.TotalFiles 20}}
+Files:
+{{range .excluded.Files}}
+- {{.}}
+{{end}}
+{{else}}
+Directories with excluded files:
+{{range $dir, $count := .excluded.Directories}}
+{{if gt $count 0}}- {{$dir}}: {{$count}} files{{end}}
+{{end}}
+
+File extensions excluded:
+{{range $ext, $count := .excluded.Extensions}}
+- {{$ext}}: {{$count}} files
+{{end}}
+{{end}}
+
+{{end}}
 
 {{range .files}}
 {{if .Code}}

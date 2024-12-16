@@ -26,10 +26,19 @@ type FileInfo struct {
 	Code      string `json:"code"`
 }
 
+// New type to track excluded files and directories
+type ExcludedInfo struct {
+	Directories map[string]int    // Directory path -> count of excluded files
+	Extensions  map[string]int    // File extension -> count of excluded files
+	TotalFiles  int              // Total number of excluded files
+	Files       []string         // List of excluded files (if total ≤ 20)
+}
+
 type treeNode struct {
 	name     string
 	children []*treeNode
 	isDir    bool
+	excluded bool
 }
 
 func ReadExcludePatterns(patternExclude string, noDefaultExcludes bool) ([]string, error) {
@@ -58,9 +67,9 @@ func ReadExcludePatterns(patternExclude string, noDefaultExcludes bool) ([]strin
 		// If user has a default.glob, it overrides the default patterns
 		if _, err := os.Stat(userDefaultGlob); err == nil {
 			return readGlobFile(userDefaultGlob)
-		}
+	}
 
-		// Read other user-defined patterns
+	// Read other user-defined patterns
 		userPatterns, _ := readGlobFilesFromDir(userPatternsDir)
 
 		// Combine user patterns with default patterns (if not disabled)
@@ -69,6 +78,30 @@ func ReadExcludePatterns(patternExclude string, noDefaultExcludes bool) ([]strin
 
 	return patterns, nil
 }
+
+// Helper functions to track exclusions
+func trackExcludedFile(excluded *ExcludedInfo, path string, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	excluded.TotalFiles++
+
+	// Track the directory
+	dir := filepath.Dir(path)
+	excluded.Directories[dir]++
+
+	// Track the extension
+	ext := filepath.Ext(path)
+	if ext != "" {
+		excluded.Extensions[ext]++
+	}
+
+	// Only store individual files if we haven't exceeded 20
+	if excluded.TotalFiles <= 20 {
+		excluded.Files = append(excluded.Files, path)
+	}
+}
+
 
 func readGlobFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
@@ -111,15 +144,27 @@ func readGlobFilesFromDir(dir string) ([]string, error) {
 	return patterns, err
 }
 
-func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes bool) (string, []FileInfo, error) {
+func trackExcludedDirectory(excluded *ExcludedInfo, path string, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
+	excluded.Directories[path] = 0 // Initialize directory count
+}
+
+func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes bool) (string, []FileInfo, *ExcludedInfo, error) {
 	var files []FileInfo
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
+	excluded := &ExcludedInfo{
+		Directories: make(map[string]int),
+		Extensions:  make(map[string]int),
+		Files:      make([]string, 0),
+	}
+
 	// Read exclude patterns
 	defaultExcludes, err := ReadExcludePatterns(patternExclude, noDefaultExcludes)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to read exclude patterns: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to read exclude patterns: %w", err)
 	}
 
 	// Combine user-provided exclude patterns with default excludes (if not disabled)
@@ -131,34 +176,34 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 	// Read .gitignore if it exists
 	gitignore, err := readGitignore(rootPath)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to read .gitignore: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to read .gitignore: %w", err)
 	}
 
 	// Check if rootPath is a file or directory
 	fileInfo, err := os.Stat(rootPath)
 	if err != nil {
-		return "", nil, fmt.Errorf("failed to get file info: %w", err)
+		return "", nil, nil, fmt.Errorf("failed to get file info: %w", err)
 	}
 
 	// Check if rootPath is a single PDF file
 	if !fileInfo.IsDir() {
 		isPDF, err := pdf.IsPDF(rootPath)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to check if file is PDF: %w", err)
+			return "", nil, nil, fmt.Errorf("failed to check if file is PDF: %w", err)
 		}
 
 		if isPDF {
 			// Process single PDF file directly
 			content, err := pdf.ConvertPDFToMarkdown(rootPath, false)
 			if err != nil {
-				return "", nil, fmt.Errorf("failed to convert PDF: %w", err)
+				return "", nil, nil, fmt.Errorf("failed to convert PDF: %w", err)
 			}
 
 			return fmt.Sprintf("File: %s", rootPath), []FileInfo{{
 				Path:      rootPath,
 				Extension: ".md",
 				Code:      content,
-			}}, nil
+			}}, excluded, nil
 		}
 	}
 
@@ -173,13 +218,15 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 				defer wg.Done()
 				processFile(rootPath, relPath, filepath.Dir(rootPath), lineNumber, relativePaths, noCodeblock, &mu, &files)
 			}()
+		} else {
+			trackExcludedFile(excluded, rootPath, &mu)
 		}
 		treeString = fmt.Sprintf("File: %s", rootPath)
 	} else {
 		// Generate the tree representation for directory
 		treeString, err = generateTreeString(rootPath, allExcludePatterns)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to generate directory tree: %w", err)
+			return "", nil, nil, fmt.Errorf("failed to generate directory tree: %w", err)
 		}
 
 		// Process files in directory
@@ -196,8 +243,15 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 			// Check if the current path (file or directory) should be excluded
 			if shouldExcludePath(relPath, allExcludePatterns, gitignore) {
 				if info.IsDir() {
+					trackExcludedDirectory(excluded, path, &mu)
 					return filepath.SkipDir
 				}
+				trackExcludedFile(excluded, path, &mu)
+				return nil
+			}
+
+			if !info.IsDir() && !shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) {
+				trackExcludedFile(excluded, path, &mu)
 				return nil
 			}
 
@@ -216,10 +270,10 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 	wg.Wait()
 
 	if err != nil {
-		return "", nil, err
+		return "", nil, excluded, err
 	}
 
-	return treeString, files, nil
+	return treeString, files, excluded, nil
 }
 
 // New helper function to check if a path should be excluded
@@ -227,7 +281,7 @@ func shouldExcludePath(path string, excludePatterns []string, gitignore *ignore.
 	for _, pattern := range excludePatterns {
 		if match, _ := doublestar.Match(pattern, path); match {
 			return true
-		}
+	}
 	}
 	return gitignore != nil && gitignore.MatchesPath(path)
 }
@@ -299,7 +353,7 @@ func isBinaryFile(filePath string) (bool, error) {
 	n, err := file.Read(buffer)
 	if err != nil && err != io.EOF {
 		return false, err
-	}
+}
 
 	// Use http.DetectContentType to determine the content type
 	contentType := http.DetectContentType(buffer[:n])
@@ -397,6 +451,8 @@ func processFile(path, relPath string, rootPath string, lineNumber, relativePath
 
 func generateTreeString(rootPath string, excludePatterns []string) (string, error) {
 	root := &treeNode{name: filepath.Base(rootPath), isDir: true}
+	hasExclusions := false
+
 	err := filepath.Walk(rootPath, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -413,9 +469,59 @@ func generateTreeString(rootPath string, excludePatterns []string) (string, erro
 		}
 
 		// Check if the path should be excluded
-		if isExcluded(relPath, excludePatterns) {
+		excluded := isExcluded(relPath, excludePatterns)
+		if excluded {
+			hasExclusions = true
 			if info.IsDir() {
+				// Add the excluded directory to the tree with an X marker
+				parts := strings.Split(relPath, string(os.PathSeparator))
+				current := root
+				for i, part := range parts {
+					found := false
+					for _, child := range current.children {
+						if child.name == part {
+							current = child
+							found = true
+							break
+						}
+					}
+					if !found {
+						newNode := &treeNode{
+							name:      part,
+							isDir:     true,
+							excluded:  true,
+						}
+						current.children = append(current.children, newNode)
+						current = newNode
+					}
+					if i == len(parts)-1 {
+						current.isDir = true
+						current.excluded = true
+					}
+				}
 				return filepath.SkipDir
+			}
+			// Add excluded files to the tree with an X marker
+			parts := strings.Split(relPath, string(os.PathSeparator))
+			current := root
+			for i, part := range parts {
+				found := false
+				for _, child := range current.children {
+					if child.name == part {
+						current = child
+						found = true
+						break
+					}
+				}
+				if !found {
+					newNode := &treeNode{
+						name:     part,
+						isDir:    i < len(parts)-1,
+						excluded: true,
+					}
+					current.children = append(current.children, newNode)
+					current = newNode
+				}
 			}
 			return nil
 		}
@@ -449,6 +555,9 @@ func generateTreeString(rootPath string, excludePatterns []string) (string, erro
 	}
 
 	var output strings.Builder
+	if hasExclusions {
+		output.WriteString("(Files/directories marked with ❌ are excluded or not included here)\n\n")
+	}
 	output.WriteString(root.name + "/\n")
 	for i, child := range root.children {
 		printTree(child, "", i == len(root.children)-1, &output)
@@ -470,6 +579,9 @@ func printTree(node *treeNode, prefix string, isLast bool, output *strings.Build
 	if node.isDir {
 		output.WriteString("/")
 	}
+	if node.excluded {
+		output.WriteString(" ❌")
+	}
 	output.WriteString("\n")
 
 	sort.Slice(node.children, func(i, j int) bool {
@@ -483,6 +595,7 @@ func printTree(node *treeNode, prefix string, isLast bool, output *strings.Build
 		printTree(child, prefix, i == len(node.children)-1, output)
 	}
 }
+
 func isExcluded(path string, patterns []string) bool {
 	for _, pattern := range patterns {
 		if match, _ := doublestar.Match(pattern, path); match {

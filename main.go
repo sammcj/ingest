@@ -236,6 +236,7 @@ func run(cmd *cobra.Command, args []string) error {
 	var allFiles []filesystem.FileInfo
 	var allTrees []string
 	var gitData []GitData
+	var allExcluded []*filesystem.ExcludedInfo
 
 	remainingArgs := make([]string, len(args))
 	copy(remainingArgs, args)
@@ -275,10 +276,11 @@ func run(cmd *cobra.Command, args []string) error {
 
 		var files []filesystem.FileInfo
 		var tree string
+		var excluded *filesystem.ExcludedInfo
 
 		if fileInfo.IsDir() {
 			// Existing directory processing logic
-			tree, files, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes)
+			tree, files, excluded, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes)
 			if err != nil {
 				return fmt.Errorf("failed to process directory %s: %w", arg, err)
 			}
@@ -295,6 +297,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 		allFiles = append(allFiles, files...)
 		allTrees = append(allTrees, tree)
+		if excluded != nil {
+			allExcluded = append(allExcluded, excluded)
+		}
 
 		// Handle git operations for each path
 		gitDiffContent := ""
@@ -342,7 +347,9 @@ func run(cmd *cobra.Command, args []string) error {
 		"source_trees": strings.Join(allTrees, "\n\n"),
 		"files":        allFiles,
 		"git_data":     gitData,
+		"excluded":     allExcluded[0], // Use the first excluded info if there are multiple paths
 	}
+
 
 	if err := spinner.Finish(); err != nil {
 		return fmt.Errorf("failed to finish spinner: %w", err)
