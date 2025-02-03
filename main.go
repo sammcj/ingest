@@ -468,12 +468,13 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 			err := utils.CopyToClipboard(rendered)
 			if err == nil {
 				utils.AddMessage("✅", "Copied to clipboard successfully.", color.FgGreen, 5)
-				return nil
+			} else {
+				// If clipboard copy failed, fall back to console output
+				utils.PrintColouredMessage("i", fmt.Sprintf("Failed to copy to clipboard: %v. Falling back to console output.", err), color.FgYellow)
 			}
-			// If clipboard copy failed, fall back to console output
-			utils.PrintColouredMessage("i", fmt.Sprintf("Failed to copy to clipboard: %v. Falling back to console output.", err), color.FgYellow)
 		}
 
+		fmt.Print("output is %s", output)
 		if output != "" {
 			err := utils.WriteToFile(output, rendered)
 			if err != nil {
