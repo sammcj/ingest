@@ -343,11 +343,16 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prepare data for template
+	var excludedInfo interface{}
+	if len(allExcluded) > 0 {
+		excludedInfo = allExcluded[0] // Use the first excluded info if available
+	}
+
 	data := map[string]interface{}{
 		"source_trees": strings.Join(allTrees, "\n\n"),
 		"files":        allFiles,
 		"git_data":     gitData,
-		"excluded":     allExcluded[0], // Use the first excluded info if there are multiple paths
+		"excluded":     excludedInfo,
 	}
 
 

@@ -15,7 +15,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06
-	github.com/sashabaranov/go-openai v1.39.0
+	github.com/sashabaranov/go-openai v1.39.1
 	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/spf13/cobra v1.9.1
 )
@@ -26,7 +26,7 @@ require (
 	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
 	github.com/charmbracelet/x/exp/slice v0.0.0-20250501183327-ad3bc78c6a81 // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/sammcj/gollama v1.33.0 // indirect
+	github.com/sammcj/gollama v1.33.1 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/text v0.24.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
