@@ -182,7 +182,6 @@ func run(cmd *cobra.Command, args []string) error {
 	if err := utils.EnsureConfigDirectories(); err != nil {
 		return fmt.Errorf("failed to ensure config directories: %w", err)
 	}
-
 	// If no arguments are provided, use the current directory
 	if len(args) == 0 {
 		currentDir, err := os.Getwd()
@@ -355,7 +354,6 @@ func run(cmd *cobra.Command, args []string) error {
 		"excluded":     excludedInfo,
 	}
 
-
 	if err := spinner.Finish(); err != nil {
 		return fmt.Errorf("failed to finish spinner: %w", err)
 	}
@@ -369,13 +367,9 @@ func run(cmd *cobra.Command, args []string) error {
 	// Check if save is set in config or flag
 	autoSave, _ := cmd.Flags().GetBool("save")
 	if cfg.AutoSave || autoSave {
-		currentDir, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get current directory: %w", err)
-		}
-
-		if err := autoSaveOutput(rendered, currentDir); err != nil {
-			utils.PrintColouredMessage("❌", fmt.Sprintf("Error saving file: %v", err), color.FgRed)
+		// Pass the output flag value to autoSaveOutput
+		if err := autoSaveOutput(rendered, output, args[0]); err != nil { // Assuming args[0] is a representative source path
+			utils.PrintColouredMessage("❌", fmt.Sprintf("Error auto-saving file: %v", err), color.FgRed)
 		}
 	}
 
@@ -394,7 +388,13 @@ func run(cmd *cobra.Command, args []string) error {
 			utils.PrintColouredMessage("❌", fmt.Sprintf("LLM output error: %v", err), color.FgRed)
 		}
 	} else {
-		if err := handleOutput(rendered, tokens, encoding, noClipboard, output, jsonOutput, report || verbose, allFiles); err != nil {
+		// If both --save and --output are used, we don't want handleOutput to write the file
+		// as autoSaveOutput will handle it
+		outputForHandleOutput := output
+		if (cfg.AutoSave || autoSave) && output != "" {
+			outputForHandleOutput = ""
+		}
+		if err := handleOutput(rendered, tokens, encoding, noClipboard, outputForHandleOutput, jsonOutput, report || verbose, allFiles); err != nil {
 			return fmt.Errorf("failed to handle output: %w", err)
 		}
 	}
@@ -469,24 +469,34 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 		}
 		fmt.Println(string(jsonBytes))
 	} else {
+		outputWritten := false
+		if output != "" {
+			err := utils.WriteToFile(output, rendered)
+			if err != nil {
+				// Report the error but continue to potentially copy to clipboard or print
+				utils.PrintColouredMessage("❌", fmt.Sprintf("Failed to write to file %s: %v", output, err), color.FgRed)
+			} else {
+				utils.AddMessage("✅", fmt.Sprintf("Written to file: %s", output), color.FgGreen, 20)
+				outputWritten = true
+			}
+		}
+
+		clipboardCopied := false
 		if !noClipboard {
 			err := utils.CopyToClipboard(rendered)
 			if err == nil {
 				utils.AddMessage("✅", "Copied to clipboard successfully.", color.FgGreen, 5)
-				return nil
+				clipboardCopied = true
+			} else {
+				// Only show clipboard error if we didn't write to a file
+				if !outputWritten {
+					utils.PrintColouredMessage("⚠️", fmt.Sprintf("Failed to copy to clipboard: %v.", err), color.FgYellow)
+				}
 			}
-			// If clipboard copy failed, fall back to console output
-			utils.PrintColouredMessage("i", fmt.Sprintf("Failed to copy to clipboard: %v. Falling back to console output.", err), color.FgYellow)
 		}
 
-		if output != "" {
-			err := utils.WriteToFile(output, rendered)
-			if err != nil {
-				return fmt.Errorf("failed to write to file: %w", err)
-			}
-			utils.AddMessage("✅", fmt.Sprintf("Written to file: %s", output), color.FgGreen, 20)
-		} else {
-			// If no output file is specified, print to console
+		// If neither output file was written nor clipboard was copied, print to console
+		if !outputWritten && !clipboardCopied {
 			fmt.Print(rendered)
 		}
 	}
@@ -727,26 +737,55 @@ func performVRAMEstimation(content string) error {
 	return nil
 }
 
-func autoSaveOutput(content string, sourcePath string) error {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get user home directory: %w", err)
+// autoSaveOutput saves the content based on the combination of --save and --output flags:
+// - If only --save is used, save to ~/ingest/<dirname>.md
+// - If --save and --output ./somefile.md, only save to ./somefile.md
+// - If --save and --output somefile.md, save to ~/ingest/somefile.md
+func autoSaveOutput(content string, outputPath string, sourcePath string) error {
+	var finalPath string
+
+	if outputPath != "" {
+		if strings.HasPrefix(outputPath, "./") || strings.HasPrefix(outputPath, "../") || filepath.IsAbs(outputPath) {
+			// Case: --output starts with ./ or ../ or is absolute path
+			// Save only to the specified output path
+			absOutputPath, err := filepath.Abs(outputPath)
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path for output file %s: %w", outputPath, err)
+			}
+			finalPath = absOutputPath
+		} else {
+			// Case: --output is just a filename
+			// Save to ~/ingest/ with the specified filename
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get user home directory: %w", err)
+			}
+			ingestDir := filepath.Join(homeDir, "ingest")
+			finalPath = filepath.Join(ingestDir, outputPath)
+		}
+	} else {
+		// Default --save behavior
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		ingestDir := filepath.Join(homeDir, "ingest")
+		fileName := filepath.Base(sourcePath) + ".md"
+		finalPath = filepath.Join(ingestDir, fileName)
 	}
 
-	ingestDir := filepath.Join(homeDir, "ingest")
-	if err := os.MkdirAll(ingestDir, 0700); err != nil {
-		return fmt.Errorf("failed to create ingest directory: %w", err)
+	// Ensure the directory for the final path exists
+	finalDir := filepath.Dir(finalPath)
+	if err := os.MkdirAll(finalDir, 0700); err != nil {
+		return fmt.Errorf("failed to create directory %s for auto-save file: %w", finalDir, err)
 	}
 
-	fileName := filepath.Base(sourcePath) + ".md"
-	filePath := filepath.Join(ingestDir, fileName)
-
-	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
+	// Write the file using os.WriteFile
+	if err := os.WriteFile(finalPath, []byte(content), 0600); err != nil {
+		return fmt.Errorf("failed to write auto-save file to %s: %w", finalPath, err)
 	}
 
-	utils.AddMessage("✅", fmt.Sprintf("Automatically saved to %s", filePath), color.FgGreen, 10)
-
+	utils.AddMessage("💾", fmt.Sprintf("Auto-saved to: %s", finalPath), color.FgMagenta, 15) // Changed icon and message slightly
 	return nil
 }
 
