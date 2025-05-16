@@ -212,6 +212,8 @@ ingest --llm -p "explain this code" /path/to/project
 
 ## Code Compression with Tree-sitter
 
+**Experimental**
+
 Ingest can compress source code files by extracting key structural information while omitting implementation details. This is useful for reducing token usage while preserving the important parts of the code structure.
 
 ```shell
