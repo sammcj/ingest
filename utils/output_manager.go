@@ -8,9 +8,9 @@ import (
 )
 
 type OutputMessage struct {
-	Symbol  string
-	Message string
-	Color   color.Attribute
+	Symbol   string
+	Message  string
+	Color    color.Attribute
 	Priority int
 }
 
@@ -24,9 +24,9 @@ func AddMessage(symbol string, message string, messageColor color.Attribute, pri
 	mutex.Lock()
 	defer mutex.Unlock()
 	messages = append(messages, OutputMessage{
-		Symbol:  symbol,
-		Message: message,
-		Color:   messageColor,
+		Symbol:   symbol,
+		Message:  message,
+		Color:    messageColor,
 		Priority: priority,
 	})
 }

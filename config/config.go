@@ -18,9 +18,9 @@ type OllamaConfig struct {
 }
 
 type Config struct {
-	Ollama []OllamaConfig `json:"ollama"`
-	LLM    LLMConfig      `json:"llm"`
-	AutoSave bool         `json:"auto_save"`
+	Ollama   []OllamaConfig `json:"ollama"`
+	LLM      LLMConfig      `json:"llm"`
+	AutoSave bool           `json:"auto_save"`
 }
 
 type LLMConfig struct {

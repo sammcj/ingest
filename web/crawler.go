@@ -39,8 +39,8 @@ type Crawler struct {
 	options         CrawlOptions
 	converter       *md.Converter
 	excludePatterns []string
-	initialPath     string    // Store the initial URL path
-	singlePageMode  bool      // True if crawling a specific page
+	initialPath     string // Store the initial URL path
+	singlePageMode  bool   // True if crawling a specific page
 }
 
 func NewCrawler(options CrawlOptions, startURL string) *Crawler {
@@ -55,12 +55,12 @@ func NewCrawler(options CrawlOptions, startURL string) *Crawler {
 	// Create a new converter with GitHub Flavored Markdown support
 	converter := md.NewConverter("", true, &md.Options{
 		// Configure the converter to handle common edge cases
-		StrongDelimiter: "**",
-		EmDelimiter:     "*",
-		LinkStyle:       "inlined",
-		HeadingStyle:    "atx",
-		HorizontalRule: "---",
-		CodeBlockStyle: "fenced",
+		StrongDelimiter:  "**",
+		EmDelimiter:      "*",
+		LinkStyle:        "inlined",
+		HeadingStyle:     "atx",
+		HorizontalRule:   "---",
+		CodeBlockStyle:   "fenced",
 		BulletListMarker: "-",
 	})
 
@@ -68,7 +68,7 @@ func NewCrawler(options CrawlOptions, startURL string) *Crawler {
 	converter.Use(plugin.GitHubFlavored())
 
 	// Configure the converter to handle specific elements
-	converter.Keep("math", "script[type='math/tex']") // Keep math formulas
+	converter.Keep("math", "script[type='math/tex']")         // Keep math formulas
 	converter.Remove("script", "style", "iframe", "noscript") // Remove unwanted elements
 
 	return &Crawler{
@@ -252,7 +252,7 @@ func (c *Crawler) Crawl(startURL string) ([]*WebPage, error) {
 	var crawlPage func(urlStr string, depth int)
 	crawlPage = func(urlStr string, depth int) {
 		defer wg.Done()
-		semaphore <- struct{}{} // Acquire
+		semaphore <- struct{}{}        // Acquire
 		defer func() { <-semaphore }() // Release
 
 		page, err := c.fetchPage(urlStr, depth)

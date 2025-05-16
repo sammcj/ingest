@@ -29,6 +29,9 @@ clean:
 	$(GOCLEAN)
 	rm -f $(BINARY_NAME)
 
+lint:
+	gofmt -s -w .
+
 test:
 	$(GOTEST) -v ./...
 

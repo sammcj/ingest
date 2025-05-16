@@ -18,6 +18,7 @@ import (
 	"github.com/sammcj/ingest/config"
 	"github.com/sammcj/ingest/filesystem"
 	"github.com/sammcj/ingest/git"
+	"github.com/sammcj/ingest/internal/compressor" // Added compressor import
 	"github.com/sammcj/ingest/template"
 	"github.com/sammcj/ingest/token"
 	"github.com/sammcj/ingest/utils"
@@ -65,6 +66,7 @@ var (
 	webAllowedDomains    []string
 	webTimeout           int
 	webConcurrentJobs    int
+	compressFlag         bool // Added compress flag
 )
 
 type GitData struct {
@@ -111,6 +113,7 @@ func init() {
 	rootCmd.Flags().BoolP("save", "s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
 	rootCmd.Flags().Bool("config", false, "Open the config file in the default editor")
 	rootCmd.Flags().BoolVar(&noDefaultExcludes, "no-default-excludes", false, "Disable default exclude patterns")
+	rootCmd.Flags().BoolVar(&compressFlag, "compress", false, "Enable code compression using Tree-sitter") // Added compress flag
 
 	// Web Crawler flags
 	rootCmd.Flags().BoolVar(&webCrawl, "web", false, "Enable web crawling mode")
@@ -277,16 +280,22 @@ func run(cmd *cobra.Command, args []string) error {
 		var tree string
 		var excluded *filesystem.ExcludedInfo
 
+		// Initialize the compressor if the flag is set
+		var comp *compressor.GenericCompressor
+		if compressFlag {
+			comp = compressor.NewGenericCompressor()
+		}
+
 		if fileInfo.IsDir() {
 			// Existing directory processing logic
-			tree, files, excluded, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes)
+			tree, files, excluded, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes, comp) // Pass compressor
 			if err != nil {
 				return fmt.Errorf("failed to process directory %s: %w", arg, err)
 			}
 			tree = fmt.Sprintf("%s:\n%s", absPath, tree)
 		} else {
 			// New file processing logic
-			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock)
+			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock, comp) // Pass compressor
 			if err != nil {
 				return fmt.Errorf("failed to process file %s: %w", arg, err)
 			}
