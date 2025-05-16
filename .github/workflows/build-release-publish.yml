@@ -58,11 +58,17 @@ jobs:
       - name: Get dependencies
         run: go mod download
 
+      - name: Set up C compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
       - name: Run tests
         run: go test -v ./...
 
       - name: Build
         env:
+          CGO_ENABLED: "1" # Explicitly enable CGo
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           VERSION: ${{ steps.set_version.outputs.new_tag }}
