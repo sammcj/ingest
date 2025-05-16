@@ -11,7 +11,7 @@ on:
       - 'README.md'
 
 env:
-  GO_VERSION: '1.24'
+  GO_VERSION: '1.24.3' # Updated to match toolchain
   BINARY_NAME: 'ingest'
 
 permissions:
@@ -33,10 +33,10 @@ jobs:
             arch: amd64
             runner: ubuntu-latest
             c_compiler_package: "build-essential"
-          - os: linux
-            arch: arm64
-            runner: ubuntu-latest
-            c_compiler_package: "build-essential gcc-aarch64-linux-gnu"
+          # - os: linux
+          #   arch: arm64
+          #   runner: ubuntu-latest-arm64 # Use native ARM64 runner
+          #   c_compiler_package: "build-essential" # Native compiler
     runs-on: ${{ matrix.target.runner }}
 
     outputs:
