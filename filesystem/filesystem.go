@@ -16,6 +16,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/mitchellh/go-homedir"
 	ignore "github.com/sabhiram/go-gitignore"
+	"github.com/sammcj/ingest/internal/compressor"
 	"github.com/sammcj/ingest/pdf"
 	"github.com/sammcj/ingest/utils"
 )
@@ -28,10 +29,10 @@ type FileInfo struct {
 
 // New type to track excluded files and directories
 type ExcludedInfo struct {
-	Directories map[string]int    // Directory path -> count of excluded files
-	Extensions  map[string]int    // File extension -> count of excluded files
-	TotalFiles  int              // Total number of excluded files
-	Files       []string         // List of excluded files (if total ≤ 20)
+	Directories map[string]int // Directory path -> count of excluded files
+	Extensions  map[string]int // File extension -> count of excluded files
+	TotalFiles  int            // Total number of excluded files
+	Files       []string       // List of excluded files (if total ≤ 20)
 }
 
 type treeNode struct {
@@ -67,9 +68,9 @@ func ReadExcludePatterns(patternExclude string, noDefaultExcludes bool) ([]strin
 		// If user has a default.glob, it overrides the default patterns
 		if _, err := os.Stat(userDefaultGlob); err == nil {
 			return readGlobFile(userDefaultGlob)
-	}
+		}
 
-	// Read other user-defined patterns
+		// Read other user-defined patterns
 		userPatterns, _ := readGlobFilesFromDir(userPatternsDir)
 
 		// Combine user patterns with default patterns (if not disabled)
@@ -101,7 +102,6 @@ func trackExcludedFile(excluded *ExcludedInfo, path string, mu *sync.Mutex) {
 		excluded.Files = append(excluded.Files, path)
 	}
 }
-
 
 func readGlobFile(filename string) ([]string, error) {
 	file, err := os.Open(filename)
@@ -150,7 +150,7 @@ func trackExcludedDirectory(excluded *ExcludedInfo, path string, mu *sync.Mutex)
 	excluded.Directories[path] = 0 // Initialize directory count
 }
 
-func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes bool) (string, []FileInfo, *ExcludedInfo, error) {
+func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes bool, comp *compressor.GenericCompressor) (string, []FileInfo, *ExcludedInfo, error) {
 	var files []FileInfo
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -158,7 +158,7 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 	excluded := &ExcludedInfo{
 		Directories: make(map[string]int),
 		Extensions:  make(map[string]int),
-		Files:      make([]string, 0),
+		Files:       make([]string, 0),
 	}
 
 	// Read exclude patterns
@@ -216,7 +216,7 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				processFile(rootPath, relPath, filepath.Dir(rootPath), lineNumber, relativePaths, noCodeblock, &mu, &files)
+				processFile(rootPath, relPath, filepath.Dir(rootPath), lineNumber, relativePaths, noCodeblock, &mu, &files, comp)
 			}()
 		} else {
 			trackExcludedFile(excluded, rootPath, &mu)
@@ -259,7 +259,7 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 				wg.Add(1)
 				go func(path, relPath string, info os.FileInfo) {
 					defer wg.Done()
-					processFile(path, relPath, rootPath, lineNumber, relativePaths, noCodeblock, &mu, &files)
+					processFile(path, relPath, rootPath, lineNumber, relativePaths, noCodeblock, &mu, &files, comp)
 				}(path, relPath, info)
 			}
 
@@ -281,7 +281,7 @@ func shouldExcludePath(path string, excludePatterns []string, gitignore *ignore.
 	for _, pattern := range excludePatterns {
 		if match, _ := doublestar.Match(pattern, path); match {
 			return true
-	}
+		}
 	}
 	return gitignore != nil && gitignore.MatchesPath(path)
 }
@@ -353,7 +353,7 @@ func isBinaryFile(filePath string) (bool, error) {
 	n, err := file.Read(buffer)
 	if err != nil && err != io.EOF {
 		return false, err
-}
+	}
 
 	// Use http.DetectContentType to determine the content type
 	contentType := http.DetectContentType(buffer[:n])
@@ -371,7 +371,7 @@ func PrintDefaultExcludes() {
 	fmt.Println(strings.Join(excludes, "\n"))
 }
 
-func processFile(path, relPath string, rootPath string, lineNumber, relativePaths, noCodeblock bool, mu *sync.Mutex, files *[]FileInfo) {
+func processFile(path, relPath string, rootPath string, lineNumber, relativePaths, noCodeblock bool, mu *sync.Mutex, files *[]FileInfo, comp *compressor.GenericCompressor) {
 	// Check if it's the root path being processed (explicitly provided file)
 	isExplicitFile := path == rootPath
 
@@ -428,6 +428,28 @@ func processFile(path, relPath string, rootPath string, lineNumber, relativePath
 	}
 
 	code := string(content)
+
+	// Attempt compression if compressor is provided and it's not a PDF
+	if comp != nil && !isPDF {
+		langID, err := compressor.IdentifyLanguage(path)
+		if err == nil { // Language identified
+			compressedCode, err := comp.Compress(content, langID)
+			if err == nil {
+				code = compressedCode
+				// If compressed, we might not want to add line numbers or wrap in a generic code block
+				// as the compressor might handle formatting. For now, let's assume compressed output
+				// is final for this file's content.
+				// We'll skip line numbering and code block wrapping for compressed content.
+				goto skipFormatting
+			} else {
+				utils.PrintColouredMessage("⚠️", fmt.Sprintf("Compression failed for %s: %v. Using original content.", path, err), color.FgYellow)
+			}
+		} else {
+			// Language not identified for compression, use original content
+			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Language not identified for compression for %s. Using original content.", path), color.FgBlue)
+		}
+	}
+
 	if lineNumber {
 		code = addLineNumbers(code)
 	}
@@ -435,6 +457,7 @@ func processFile(path, relPath string, rootPath string, lineNumber, relativePath
 		code = wrapCodeBlock(code, filepath.Ext(path))
 	}
 
+skipFormatting:
 	filePath := path
 	if relativePaths {
 		filePath = filepath.Join(filepath.Base(rootPath), relPath)
@@ -487,9 +510,9 @@ func generateTreeString(rootPath string, excludePatterns []string) (string, erro
 					}
 					if !found {
 						newNode := &treeNode{
-							name:      part,
-							isDir:     true,
-							excluded:  true,
+							name:     part,
+							isDir:    true,
+							excluded: true,
 						}
 						current.children = append(current.children, newNode)
 						current = newNode
@@ -608,7 +631,7 @@ func isExcluded(path string, patterns []string) bool {
 	return false
 }
 
-func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool) (FileInfo, error) {
+func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool, comp *compressor.GenericCompressor) (FileInfo, error) {
 	// Check if it's a PDF first
 	isPDF, err := pdf.IsPDF(path)
 	if err != nil {
@@ -635,6 +658,24 @@ func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool)
 	}
 
 	code := string(content)
+
+	// Attempt compression if compressor is provided and it's not a PDF
+	if comp != nil && !isPDF {
+		langID, err := compressor.IdentifyLanguage(path)
+		if err == nil { // Language identified
+			compressedCode, err := comp.Compress(content, langID)
+			if err == nil {
+				code = compressedCode
+				// Skip standard formatting for compressed content
+				goto skipSingleFileFormatting
+			} else {
+				utils.PrintColouredMessage("⚠️", fmt.Sprintf("Compression failed for %s: %v. Using original content.", path, err), color.FgYellow)
+			}
+		} else {
+			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Language not identified for compression for %s. Using original content.", path), color.FgBlue)
+		}
+	}
+
 	if lineNumber {
 		code = addLineNumbers(code)
 	}
@@ -642,6 +683,7 @@ func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool)
 		code = wrapCodeBlock(code, filepath.Ext(path))
 	}
 
+skipSingleFileFormatting:
 	filePath := path
 	if relativePaths {
 		filePath = filepath.Base(path)

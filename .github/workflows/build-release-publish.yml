@@ -11,7 +11,7 @@ on:
       - 'README.md'
 
 env:
-  GO_VERSION: '1.22'
+  GO_VERSION: '1.24.3' # Updated to match toolchain
   BINARY_NAME: 'ingest'
 
 permissions:
@@ -22,16 +22,22 @@ jobs:
   build:
     if: ${{ ! contains(github.event.head_commit.message, '[skip ci]') && ! contains(github.event.pull_request.title, '[skip ci]')}}
     name: Build
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
+        target:
           - os: darwin
             arch: arm64
+            runner: macos-14
+            c_compiler_package: ""
           - os: linux
             arch: amd64
-          - os: linux
-            arch: arm64
+            runner: ubuntu-latest
+            c_compiler_package: "build-essential"
+          # - os: linux
+          #   arch: arm64
+          #   runner: ubuntu-latest-arm64 # Use native ARM64 runner
+          #   c_compiler_package: "build-essential" # Native compiler
+    runs-on: ${{ matrix.target.runner }}
 
     outputs:
       version: ${{ steps.set_version.outputs.new_tag }}
@@ -58,25 +64,32 @@ jobs:
       - name: Get dependencies
         run: go mod download
 
+      - name: Set up C compiler
+        if: startsWith(matrix.target.runner, 'ubuntu') && matrix.target.c_compiler_package != ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.target.c_compiler_package }}
+
       - name: Run tests
         run: go test -v ./...
 
       - name: Build
         env:
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: "1" # Explicitly enable CGo
+          GOOS: ${{ matrix.target.os }}
+          GOARCH: ${{ matrix.target.arch }}
           VERSION: ${{ steps.set_version.outputs.new_tag }}
 
         run: |
-          go build -v -ldflags "-X main.Version=$version" -o build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }} .
+          go build -v -ldflags "-X main.Version=$VERSION" -o build/${{ env.BINARY_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }} .
           ls -ltarh build/
 
       - name: Upload artifact
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          name: ${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
-          path: build/${{ env.BINARY_NAME }}-${{ matrix.os }}-${{ matrix.arch }}
+          name: ${{ env.BINARY_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
+          path: build/${{ env.BINARY_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }}
           retention-days: 90
 
   release:

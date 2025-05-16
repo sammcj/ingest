@@ -20,6 +20,7 @@ And ingest web URLs.
 
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
+- Compress code using Tree-sitter to extract key structural information while omitting implementation details
 - Estimate vRAM requirements and check model compatibility using another package I've created called [quantest](https://github.com/sammcj/quantest)
 - Parse output directly to LLMs such as Ollama or any OpenAI compatible API for processing
 - Generate and include git diffs and logs
@@ -209,6 +210,44 @@ You can provide a prompt suffix to append to the generated prompt:
 ingest --llm -p "explain this code" /path/to/project
 ```
 
+## Code Compression with Tree-sitter
+
+**Experimental**
+
+Ingest can compress source code files by extracting key structural information while omitting implementation details. This is useful for reducing token usage while preserving the important parts of the code structure.
+
+```shell
+ingest --compress /path/to/project
+```
+
+The compression extracts:
+- Package/module declarations
+- Import statements
+- Function/method signatures (without bodies)
+- Class definitions (without method bodies)
+- Type definitions
+- Comments
+
+Currently supported languages:
+- Go
+- Python
+- JavaScript (including arrow functions and ES6 module syntax)
+- Bash
+- C
+- CSS
+
+Example of compressed JavaScript:
+
+```
+// This is a JavaScript comment
+import { something } from 'module';
+export class MyJSClass { ... } // Body removed
+constructor(name) { ... } // Body removed
+greet(message) { ... } // Body removed
+export function myJSFunction(x, y) { ... } // Body removed
+const myArrowFunc = (a, b) => { ... } // Body removed
+```
+
 ## Web Crawling & Ingestion
 
 Crawl with explicit web mode
@@ -272,6 +311,7 @@ These directories will be created automatically on first run, along with README 
 
 ### Flags
 
+- `--compress`: **New** Enable code compression using Tree-sitter to extract key structural information while omitting implementation details
 - `--config`: Opens the config file in the default editor
 - `--context`: Specify the context length for VRAM estimation
 - `--exclude-from-tree`: Exclude files/folders from the source tree based on exclude patterns
