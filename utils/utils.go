@@ -3,8 +3,10 @@ package utils
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -22,8 +24,36 @@ type termSize struct {
 }
 
 func CopyToClipboard(rendered string) error {
-	err := clipboard.WriteAll(rendered)
-	if err != nil {
+	if isWSL() {
+		if err := writeToWindowsClipboard(rendered); err == nil {
+			return nil
+		}
+	}
+
+	// fallback to default
+	return writeClipboard(rendered)
+}
+
+func writeToWindowsClipboard(text string) error {
+	// Copy using powershell for utf-8 encoding
+	psCmd := `[Console]::InputEncoding = [System.Text.Encoding]::UTF8; $s = [Console]::In.ReadToEnd(); Set-Clipboard -Value $s`
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-Command", psCmd)
+	stdin, err := cmd.StdinPipe()
+	if err == nil {
+		if err := cmd.Start(); err == nil {
+			_, _ = stdin.Write([]byte(text))
+			_ = stdin.Close()
+			if err := cmd.Wait(); err == nil {
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
+func writeClipboard(text string) error {
+	if err := clipboard.WriteAll(text); err != nil {
 		return fmt.Errorf("failed to copy to clipboard: %v", err)
 	}
 	return nil
@@ -131,4 +161,18 @@ func GetTerminalWidth() int {
 		return 100
 	}
 	return int(ws.Col)
+}
+
+func isWSL() bool {
+	if _, ok := os.LookupEnv("WSL_DISTRO_NAME"); ok {
+		return true
+	}
+
+	if out, err := os.ReadFile("/proc/sys/kernel/osrelease"); err == nil {
+		s := strings.ToLower(string(out))
+		if strings.Contains(s, "microsoft") || strings.Contains(s, "wsl") {
+			return true
+		}
+	}
+	return false
 }
