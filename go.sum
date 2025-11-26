@@ -107,8 +107,8 @@ github.com/olekukonko/errors v1.1.0 h1:RNuGIh15QdDenh+hNvKrJkmxxjV4hcS50Db478Ou5
 github.com/olekukonko/errors v1.1.0/go.mod h1:ppzxA5jBKcO1vIpCXQ9ZqgDh8iwODz6OXIGKU8r5m4Y=
 github.com/olekukonko/ll v0.1.2 h1:lkg/k/9mlsy0SxO5aC+WEpbdT5K83ddnNhAepz7TQc0=
 github.com/olekukonko/ll v0.1.2/go.mod h1:b52bVQRRPObe+yyBl0TxNfhesL0nedD4Cht0/zx55Ew=
-github.com/olekukonko/tablewriter v1.1.1 h1:b3reP6GCfrHwmKkYwNRFh2rxidGHcT6cgxj/sHiDDx0=
-github.com/olekukonko/tablewriter v1.1.1/go.mod h1:De/bIcTF+gpBDB3Alv3fEsZA+9unTsSzAg/ZGADCtn4=
+github.com/olekukonko/tablewriter v1.1.0 h1:N0LHrshF4T39KvI96fn6GT8HEjXRXYNDrDjKFDB7RIY=
+github.com/olekukonko/tablewriter v1.1.0/go.mod h1:5c+EBPeSqvXnLLgkm9isDdzR3wjfBkHR9Nhfp3NWrzo=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkoukk/tiktoken-go v0.1.8 h1:85ENo+3FpWgAACBaEUVp+lctuTcYUO7BtmfhlN/QTRo=
@@ -125,10 +125,10 @@ github.com/rs/zerolog v1.34.0/go.mod h1:bJsvje4Z08ROH4Nhs5iH600c3IkWhwp44iRc54W6
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 h1:OkMGxebDjyw0ULyrTYWeN0UNCCkmCWfjPnIA2W6oviI=
 github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06/go.mod h1:+ePHsJ1keEjQtpvf9HHw0f4ZeJ0TLRsxhunSI2hYJSs=
-github.com/sammcj/gollama v1.37.5 h1:SrKJjdwDtrTkiOoySrTLiF7INm4Ik1GcqVYnm4InaBU=
-github.com/sammcj/gollama v1.37.5/go.mod h1:0fICL7D5ZUsUIIXSTrSh5OC/BxmLQ521HgtBWTLY+A8=
-github.com/sammcj/quantest v0.0.12 h1:bnfec+TtAw3WPE2qJIpSYKLiXegVvEjFCIKRtCisZ7w=
-github.com/sammcj/quantest v0.0.12/go.mod h1:NIH1YZbHJLeeQqk8sXoQfEc1r49k/velbitkXSztsIM=
+github.com/sammcj/gollama v1.37.3 h1:aOkGsyCObF8Y2TQ5fzj2PVnvZMugexMAwux+WH+wjtA=
+github.com/sammcj/gollama v1.37.3/go.mod h1:NOkydPF8yjWOsSypVQkMJH1yphHq80L52Z0AMzfnPfY=
+github.com/sammcj/quantest v0.0.13 h1:d/f+Pp1aXFL0P2DRyZNOlDf4AAlqhmB1HQM+egHzDyo=
+github.com/sammcj/quantest v0.0.13/go.mod h1:nfmfRnybimGRLXd/Yq3xwIyetGyJDzJPi0a3X5RKCWk=
 github.com/sashabaranov/go-openai v1.41.2 h1:vfPRBZNMpnqu8ELsclWcAvF19lDNgh1t6TVfFFOPiSM=
 github.com/sashabaranov/go-openai v1.41.2/go.mod h1:lj5b/K+zjTSFxVLijLSTDZuP7adOgerWeFyZLUhAKRg=
 github.com/schollz/progressbar/v3 v3.18.0 h1:uXdoHABRFmNIjUfte/Ex7WtuyVslrw2wVPQmCN62HpA=
