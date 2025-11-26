@@ -11,7 +11,7 @@
 ### Code Standards
 
 - Follow Go best practices and idiomatic patterns
-- Use Australian English spelling throughout code and documentation
+- Use Australian English spelling throughout code (unless it's a function or parameter to an upstream library) and documentation
 - No marketing terms like "comprehensive" or "production-grade"
 - Focus on clear, concise, actionable technical guidance
 - Keep responses token-efficient (avoid returning unnecessary data)
@@ -46,7 +46,7 @@ Before approving any pull request, verify:
 - [ ] No security issues or vulnerabilities introduced
 - [ ] All linting and tests pass successfully
 - [ ] Documentation updated if required
-- [ ] Australian English spelling used throughout, No American English spelling used
+- [ ] Australian English spelling used throughout, No American English spelling used (unless it's a function or parameter to an upstream library)
 - [ ] Context cancellation handled properly if applicable
 - [ ] Resource cleanup with defer statements if applicable
 
