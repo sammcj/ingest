@@ -13,7 +13,7 @@ BINARY_NAME=ingest
 # Version information
 VERSION := $(shell git describe --tags --always)
 BUILD_TIME := $(shell date -u '+%Y-%m-%d_%I:%M:%S%p')
-LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
+LDFLAGS := -ldflags "-w -s -X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME)"
 
 # Main package path
 MAIN_PACKAGE=.
