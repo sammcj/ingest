@@ -24,7 +24,7 @@ And ingest web URLs.
 - Estimate vRAM requirements and check model compatibility using another package I've created called [quantest](https://github.com/sammcj/quantest)
 - Parse output directly to LLMs such as Ollama or any OpenAI compatible API for processing
 - Generate and include git diffs and logs
-- Count approximate tokens for LLM compatibility
+- Count tokens using offline tokeniser (default) or optionally use Anthropic API (API key required, but no charge for counting)
 - Customisable output templates
 - Copy output to clipboard (when available)
 - Export to file or print to console
@@ -210,6 +210,50 @@ You can provide a prompt suffix to append to the generated prompt:
 ingest --llm -p "explain this code" /path/to/project
 ```
 
+## Token Counting
+
+Ingest provides token counting using either an offline tokeniser (default) or the Anthropic API for more accurate counts.
+
+### Offline Token Counting (Default)
+
+By default, ingest uses an offline tokeniser with a correction factor for improved accuracy:
+
+```shell
+ingest /path/to/project
+# [ℹ️] Tokens (Approximate): 15,945
+```
+
+The offline tokeniser applies a 1.18x multiplier based on empirical analysis comparing it with Anthropic's API. This correction reduces average estimation error from ~17% to ~2%, providing slightly more accurate token counts without requiring an API key.
+
+To disable the correction factor and use raw token counts, use the `--no-correction` flag:
+
+```shell
+ingest --no-correction /path/to/project
+# Uses raw offline tokeniser without correction multiplier
+```
+
+The first time ingest runs, it downloads a small tokeniser file for offline use.
+
+### Anthropic API Token Counting
+
+For accurate token counts using Anthropic's counting API, use the `-a` or `--anthropic` flag:
+
+```shell
+export ANTHROPIC_API_KEY="your-api-key"
+ingest -a /path/to/project
+# ✓ Using Anthropic API (claude-sonnet-4-5) for token counting
+# [ℹ️] Tokens (Approximate): 15,942
+```
+
+The API accepts keys from these environment variables (checked in order):
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_TOKEN`
+- `ANTHROPIC_TOKEN_COUNT_KEY`
+
+**Performance optimisation**: When counting tokens for multiple files (e.g. in the "Top 15 largest files" report), ingest processes API requests in parallel batches of 4, significantly reducing the time needed for token counting.
+
+If the API call fails, ingest automatically falls back to the offline tokeniser.
+
 ## Code Compression with Tree-sitter
 
 **Experimental**
@@ -311,8 +355,10 @@ These directories will be created automatically on first run, along with README 
 
 ### Flags
 
-- `--compress`: **New** Enable code compression using Tree-sitter to extract key structural information while omitting implementation details
+- `-a, --anthropic`: Use Anthropic API for token counting (requires API key in environment)
+- `--compress`: Enable code compression using Tree-sitter to extract key structural information while omitting implementation details
 - `--config`: Opens the config file in the default editor
+- `--no-correction`: Disable offline tokeniser correction factor (use raw token count)
 - `--context`: Specify the context length for VRAM estimation
 - `--exclude-from-tree`: Exclude files/folders from the source tree based on exclude patterns
 - `--git-diff-branch`: Generate git diff between two branches
@@ -375,9 +421,5 @@ Contributions are welcome, Please feel free to submit a Pull Request.
 
 - Copyright 2024 Sam McLeod
 - This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgements
-
-- Initially inspired by [mufeedvh/code2prompt](https://github.com/mufeedvh/code2prompt)
 
 <script src="http://api.html5media.info/1.1.8/html5media.min.js"></script>

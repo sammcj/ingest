@@ -194,12 +194,15 @@ const defaultGlobContent = `
 **/.vimrc
 **/.whitesource
 **/.zcompdump*
+**/.claude/*.json
+**/.mcp.json
 **/bat-config
 **/changelog.md
 **/CHANGELOG*
 **/CLA.md
 **/CODE_OF_CONDUCT.md
 **/CODEOWNERS
+**/CONTRIBUTORS.md
 **/commitlint.config.js
 **/contributing.md
 **/CONTRIBUTING*

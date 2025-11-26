@@ -113,7 +113,7 @@ Git Log Between Branches:
 `, nil
 }
 
-func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {
+func RenderTemplate(tmpl *template.Template, data map[string]any) (string, error) {
 	var output strings.Builder
 	err := tmpl.Execute(&output, data)
 	if err != nil {
