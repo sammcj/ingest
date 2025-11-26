@@ -30,7 +30,9 @@ clean:
 	rm -f $(BINARY_NAME)
 
 lint:
-	gofmt -s -w .
+	gofmt -w -s .
+	golangci-lint run
+	go run golang.org/x/tools/gopls/internal/analysis/modernize/cmd/modernize@latest -fix -test ./...
 
 test:
 	$(GOTEST) -v ./...

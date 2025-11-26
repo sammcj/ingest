@@ -150,7 +150,7 @@ func trackExcludedDirectory(excluded *ExcludedInfo, path string, mu *sync.Mutex)
 	excluded.Directories[path] = 0 // Initialize directory count
 }
 
-func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes bool, comp *compressor.GenericCompressor) (string, []FileInfo, *ExcludedInfo, error) {
+func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, patternExclude string, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes, followSymlinks bool, comp *compressor.GenericCompressor) (string, []FileInfo, *ExcludedInfo, error) {
 	var files []FileInfo
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -210,14 +210,24 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 	var treeString string
 
 	if !fileInfo.IsDir() {
+		// Check if the single file is a symlink
+		if !followSymlinks {
+			linkInfo, err := os.Lstat(rootPath)
+			if err != nil {
+				return "", nil, nil, fmt.Errorf("failed to get symlink info: %w", err)
+			}
+			if linkInfo.Mode()&os.ModeSymlink != 0 {
+				utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Skipping symlinked file: %s", rootPath), color.FgCyan)
+				return fmt.Sprintf("File: %s (symlink, skipped)", rootPath), []FileInfo{}, excluded, nil
+			}
+		}
+
 		// Handle single file
 		relPath := filepath.Base(rootPath)
 		if shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				processFile(rootPath, relPath, filepath.Dir(rootPath), lineNumber, relativePaths, noCodeblock, &mu, &files, comp)
-			}()
+			})
 		} else {
 			trackExcludedFile(excluded, rootPath, &mu)
 		}
@@ -240,6 +250,22 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 				return err
 			}
 
+			// Check if the path is a symlink
+			if !followSymlinks {
+				linkInfo, err := os.Lstat(path)
+				if err != nil {
+					return err
+				}
+				if linkInfo.Mode()&os.ModeSymlink != 0 {
+					if linkInfo.IsDir() || (info != nil && info.IsDir()) {
+						utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Skipping symlinked directory: %s", path), color.FgCyan)
+						return filepath.SkipDir
+					}
+					utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Skipping symlinked file: %s", path), color.FgCyan)
+					return nil
+				}
+			}
+
 			// Check if the current path (file or directory) should be excluded
 			if shouldExcludePath(relPath, allExcludePatterns, gitignore) {
 				if info.IsDir() {
@@ -257,10 +283,10 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 
 			if !info.IsDir() && shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) {
 				wg.Add(1)
-				go func(path, relPath string, info os.FileInfo) {
+				go func(path, relPath string) {
 					defer wg.Done()
 					processFile(path, relPath, rootPath, lineNumber, relativePaths, noCodeblock, &mu, &files, comp)
-				}(path, relPath, info)
+				}(path, relPath)
 			}
 
 			return nil
@@ -631,7 +657,19 @@ func isExcluded(path string, patterns []string) bool {
 	return false
 }
 
-func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock bool, comp *compressor.GenericCompressor) (FileInfo, error) {
+func ProcessSingleFile(path string, lineNumber, relativePaths, noCodeblock, followSymlinks bool, comp *compressor.GenericCompressor) (FileInfo, error) {
+	// Check if the file is a symlink
+	if !followSymlinks {
+		linkInfo, err := os.Lstat(path)
+		if err != nil {
+			return FileInfo{}, fmt.Errorf("failed to get symlink info: %w", err)
+		}
+		if linkInfo.Mode()&os.ModeSymlink != 0 {
+			utils.PrintColouredMessage("ℹ️", fmt.Sprintf("Skipping symlinked file: %s", path), color.FgCyan)
+			return FileInfo{}, fmt.Errorf("file is a symlink and --follow-symlinks is not set")
+		}
+	}
+
 	// Check if it's a PDF first
 	isPDF, err := pdf.IsPDF(path)
 	if err != nil {

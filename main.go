@@ -59,6 +59,7 @@ var (
 	quantTypeFlag        string
 	verbose              bool
 	noDefaultExcludes    bool
+	followSymlinks       bool
 	Version              string // This will be set by the linker at build time
 	rootCmd              *cobra.Command
 	webCrawl             bool
@@ -113,6 +114,7 @@ func init() {
 	rootCmd.Flags().BoolP("save", "s", false, "Automatically save the generated markdown to ~/ingest/<dirname>.md")
 	rootCmd.Flags().Bool("config", false, "Open the config file in the default editor")
 	rootCmd.Flags().BoolVar(&noDefaultExcludes, "no-default-excludes", false, "Disable default exclude patterns")
+	rootCmd.Flags().BoolVar(&followSymlinks, "follow-symlinks", false, "Follow symlinked files and directories")
 	rootCmd.Flags().BoolVar(&compressFlag, "compress", false, "Enable code compression using Tree-sitter") // Added compress flag
 
 	// Web Crawler flags
@@ -243,7 +245,7 @@ func run(cmd *cobra.Command, args []string) error {
 	remainingArgs := make([]string, len(args))
 	copy(remainingArgs, args)
 
-	for i := 0; i < len(remainingArgs); i++ {
+	for i := range remainingArgs {
 		arg := remainingArgs[i]
 
 		// Check if this is a URL (either with --web flag or auto-detected)
@@ -288,14 +290,14 @@ func run(cmd *cobra.Command, args []string) error {
 
 		if fileInfo.IsDir() {
 			// Existing directory processing logic
-			tree, files, excluded, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes, comp) // Pass compressor
+			tree, files, excluded, err = filesystem.WalkDirectory(absPath, includePatterns, excludePatterns, patternExclude, includePriority, lineNumber, relativePaths, excludeFromTree, noCodeblock, noDefaultExcludes, followSymlinks, comp) // Pass compressor
 			if err != nil {
 				return fmt.Errorf("failed to process directory %s: %w", arg, err)
 			}
 			tree = fmt.Sprintf("%s:\n%s", absPath, tree)
 		} else {
 			// New file processing logic
-			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock, comp) // Pass compressor
+			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock, followSymlinks, comp) // Pass compressor
 			if err != nil {
 				return fmt.Errorf("failed to process file %s: %w", arg, err)
 			}
@@ -351,12 +353,12 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Prepare data for template
-	var excludedInfo interface{}
+	var excludedInfo any
 	if len(allExcluded) > 0 {
 		excludedInfo = allExcluded[0] // Use the first excluded info if available
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"source_trees": strings.Join(allTrees, "\n\n"),
 		"files":        allFiles,
 		"git_data":     gitData,
@@ -467,7 +469,7 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 	}
 
 	if jsonOutput {
-		jsonData := map[string]interface{}{
+		jsonData := map[string]any{
 			"prompt":      rendered,
 			"token_count": token.CountTokens(rendered, encoding),
 			"model_info":  token.GetModelInfo(encoding),
@@ -614,11 +616,9 @@ func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bo
 	}
 	defer stream.Close()
 
-	termWidth := utils.GetTerminalWidth()
-	// if the term width is over 160, set it to 160
-	if termWidth > 160 {
-		termWidth = 160
-	}
+	termWidth := min(
+		// if the term width is over 160, set it to 160
+		utils.GetTerminalWidth(), 160)
 
 	r, err := glamour.NewTermRenderer(
 		glamour.WithStandardStyle("dracula"),

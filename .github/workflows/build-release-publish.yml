@@ -11,7 +11,7 @@ on:
       - 'README.md'
 
 env:
-  GO_VERSION: '1.24.3' # Updated to match toolchain
+  GO_VERSION: '1.25.4' # Updated to match toolchain
   BINARY_NAME: 'ingest'
 
 permissions:
@@ -70,8 +70,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.target.c_compiler_package }}
 
+      - name: Run linting
+        run: make lint
+
       - name: Run tests
-        run: go test -v ./...
+        run: make test
 
       - name: Build
         env:
@@ -81,7 +84,7 @@ jobs:
           VERSION: ${{ steps.set_version.outputs.new_tag }}
 
         run: |
-          go build -v -ldflags "-X main.Version=$VERSION" -o build/${{ env.BINARY_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }} .
+          go build -v -ldflags "-w -s -X main.Version=$VERSION" -o build/${{ env.BINARY_NAME }}-${{ matrix.target.os }}-${{ matrix.target.arch }} .
           ls -ltarh build/
 
       - name: Upload artifact
