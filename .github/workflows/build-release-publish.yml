@@ -45,12 +45,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Go and cache dependencies
-        uses: actions/setup-go@41dfa10bad2bb2ae585af6ee5bb4d7d973ad74ed # v5
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -70,10 +70,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.target.c_compiler_package }}
 
-      - name: Run linting
-        run: |
-          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-          make lint
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.6
 
       - name: Run tests
         run: make test
