@@ -225,9 +225,11 @@ func WalkDirectory(rootPath string, includePatterns, excludePatterns []string, p
 		// Handle single file
 		relPath := filepath.Base(rootPath)
 		if shouldIncludeFile(relPath, includePatterns, allExcludePatterns, gitignore, includePriority) {
-			wg.Go(func() {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 				processFile(rootPath, relPath, filepath.Dir(rootPath), lineNumber, relativePaths, noCodeblock, &mu, &files, comp)
-			})
+			}()
 		} else {
 			trackExcludedFile(excluded, rootPath, &mu)
 		}

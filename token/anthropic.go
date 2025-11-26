@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 )
 
 type AnthropicTokenCountRequest struct {
@@ -26,6 +27,11 @@ type AnthropicTokenCountResponse struct {
 
 // AnthropicModel is the Claude model used for token counting
 const AnthropicModel = "claude-sonnet-4-5"
+
+// httpClient is a reusable HTTP client with connection pooling and timeout
+var httpClient = &http.Client{
+	Timeout: 30 * time.Second,
+}
 
 func getAnthropicAPIKey() (string, error) {
 	// Check environment variables in order of preference
@@ -71,8 +77,7 @@ func CountTokensAPI(content string) (int, error) {
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("failed to make request: %w", err)
 	}

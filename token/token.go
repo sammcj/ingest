@@ -10,13 +10,13 @@ import (
 )
 
 var (
-	apiUsedOnce     sync.Once
-	apiMessageShown bool
+	apiUsedOnce    sync.Once
+	apiWarningOnce sync.Once
 )
 
 // CorrectionMultiplier is applied to offline token counts for better accuracy.
 // Based on empirical analysis comparing offline tokeniser with Anthropic API,
-// the offline tokeniser underestimates by approximately 16.61%.
+// the offline tokeniser underestimates by approximately 15.25%.
 // A 1.18x multiplier reduces average error from ~17% to ~2%.
 const CorrectionMultiplier = 1.18
 
@@ -64,10 +64,9 @@ func CountTokens(rendered string, encoding string, useAnthropicAPI bool, noCorre
 	if useAnthropicAPI {
 		count, err := CountTokensAPI(rendered)
 		if err != nil {
-			if !apiMessageShown {
+			apiWarningOnce.Do(func() {
 				fmt.Printf("Warning: Failed to count tokens using Anthropic API: %v\nFalling back to offline tokeniser\n", err)
-				apiMessageShown = true
-			}
+			})
 			// Fall back to offline tokenizer
 		} else {
 			apiUsedOnce.Do(func() {
@@ -105,10 +104,9 @@ func CountTokensBatch(contents []string, encoding string, useAnthropicAPI bool, 
 	if useAnthropicAPI {
 		counts, err := CountTokensBatchAPI(contents, 4)
 		if err != nil {
-			if !apiMessageShown {
+			apiWarningOnce.Do(func() {
 				fmt.Printf("Warning: Failed to count tokens using Anthropic API: %v\nFalling back to offline tokeniser\n", err)
-				apiMessageShown = true
-			}
+			})
 			// Fall back to offline tokeniser for all items
 		} else {
 			apiUsedOnce.Do(func() {
