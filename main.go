@@ -107,7 +107,7 @@ func init() {
 	rootCmd.Flags().StringVar(&gitDiffBranch, "git-diff-branch", "", "Generate git diff between two branches")
 	rootCmd.Flags().StringVar(&gitLogBranch, "git-log-branch", "", "Retrieve git log between two branches")
 	rootCmd.Flags().StringVar(&patternExclude, "pattern-exclude", "", "Path to a specific .glob file for exclude patterns")
-	rootCmd.Flags().StringVarP(&encoding, "encoding", "c", "", "Optional tokenizer to use for token count")
+	rootCmd.Flags().StringVarP(&encoding, "encoding", "c", "o200k", "Tokeniser to use for token count (o200k, cl100k, p50k, r50k)")
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
