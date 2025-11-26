@@ -68,6 +68,8 @@ var (
 	webTimeout           int
 	webConcurrentJobs    int
 	compressFlag         bool // Added compress flag
+	anthropicFlag        bool
+	noCorrectionFlag     bool
 )
 
 type GitData struct {
@@ -116,6 +118,8 @@ func init() {
 	rootCmd.Flags().BoolVar(&noDefaultExcludes, "no-default-excludes", false, "Disable default exclude patterns")
 	rootCmd.Flags().BoolVar(&followSymlinks, "follow-symlinks", false, "Follow symlinked files and directories")
 	rootCmd.Flags().BoolVar(&compressFlag, "compress", false, "Enable code compression using Tree-sitter") // Added compress flag
+	rootCmd.Flags().BoolVarP(&anthropicFlag, "anthropic", "a", false, "Use Anthropic API for token counting (requires ANTHROPIC_API_KEY, ANTHROPIC_TOKEN, or ANTHROPIC_TOKEN_COUNT_KEY)")
+	rootCmd.Flags().BoolVar(&noCorrectionFlag, "no-correction", false, "Disable offline tokeniser correction factor (use raw token count)")
 
 	// Web Crawler flags
 	rootCmd.Flags().BoolVar(&webCrawl, "web", false, "Enable web crawling mode")
@@ -421,8 +425,6 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		return len(files[i].Code) > len(files[j].Code)
 	})
 
-	// fmt.Println("Top 15 largest files (by estimated token count):")
-	// print this in colour
 	utils.PrintColouredMessage("ℹ️", "Top 15 largest files (by estimated token count):", color.FgCyan)
 	colourRange := []*color.Color{
 		color.New(color.FgRed),
@@ -442,16 +444,22 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 		color.New(color.FgGreen),
 	}
 
-	// print the files
-	for i, file := range files {
-		tokenCount := token.CountTokens(file.Code, encoding)
-		// get the colour
+	// Limit to top 15 files
+	displayCount := min(len(files), 15)
+
+	// Collect file contents for batch processing
+	fileContents := make([]string, displayCount)
+	for i := range displayCount {
+		fileContents[i] = files[i].Code
+	}
+
+	// Count tokens in batch (uses parallel API calls if Anthropic API is enabled)
+	tokenCounts := token.CountTokensBatch(fileContents, encoding, anthropicFlag, noCorrectionFlag)
+
+	// Print the files with their token counts
+	for i := range displayCount {
 		colour := colourRange[i]
-		fmt.Printf("- %d. %s (%s tokens)\n", i+1, file.Path, colour.Sprint(utils.FormatNumber(tokenCount)))
-		// break after 14
-		if i == 14 {
-			break
-		}
+		fmt.Printf("- %d. %s (%s tokens)\n", i+1, files[i].Path, colour.Sprint(utils.FormatNumber(tokenCounts[i])))
 	}
 
 	fmt.Println()
@@ -459,7 +467,7 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 
 func handleOutput(rendered string, countTokens bool, encoding string, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
 	if countTokens {
-		tokenCount := token.CountTokens(rendered, encoding)
+		tokenCount := token.CountTokens(rendered, encoding, anthropicFlag, noCorrectionFlag)
 		println()
 		utils.AddMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow, 1)
 	}
@@ -471,7 +479,7 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 	if jsonOutput {
 		jsonData := map[string]any{
 			"prompt":      rendered,
-			"token_count": token.CountTokens(rendered, encoding),
+			"token_count": token.CountTokens(rendered, encoding, anthropicFlag, noCorrectionFlag),
 			"model_info":  token.GetModelInfo(encoding),
 		}
 		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
@@ -567,7 +575,7 @@ func printExcludePatterns(patterns []string) {
 
 func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool, encoding string) error {
 	if countTokens {
-		tokenCount := token.CountTokens(rendered, encoding)
+		tokenCount := token.CountTokens(rendered, encoding, anthropicFlag, noCorrectionFlag)
 		utils.AddMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow, 40)
 	}
 
@@ -699,7 +707,7 @@ func performVRAMEstimation(content string) error {
 		return fmt.Errorf("model ID is required for vRAM estimation")
 	}
 
-	tokenCount := token.CountTokens(content, encoding)
+	tokenCount := token.CountTokens(content, encoding, anthropicFlag, noCorrectionFlag)
 
 	// TODO: fix this:
 	// quant, err := quantest.GetOllamaQuantLevel(modelIDFlag)
