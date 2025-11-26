@@ -23,13 +23,13 @@ func (gc *GenericCompressor) Compress(content []byte, languageIdentifier string)
 	// Special cases for languages that need custom handling
 	switch languageIdentifier {
 	case "html":
-		return gc.compressHTML(content)
+		return gc.compressHTML(content), nil
 	case "rust":
-		return gc.compressRust(content)
+		return gc.compressRust(content), nil
 	case "java":
-		return gc.compressJava(content)
+		return gc.compressJava(content), nil
 	case "swift":
-		return gc.compressSwift(content)
+		return gc.compressSwift(content), nil
 	}
 
 	lang, err := GetLanguage(languageIdentifier)
@@ -59,10 +59,7 @@ func (gc *GenericCompressor) Compress(content []byte, languageIdentifier string)
 		return "", fmt.Errorf("could not execute query for '%s': %w", languageIdentifier, err)
 	}
 
-	processedChunks, err := gc.processCaptures(matches, query, content, languageIdentifier)
-	if err != nil {
-		return "", fmt.Errorf("failed to process captures: %w", err)
-	}
+	processedChunks := gc.processCaptures(matches, query, content, languageIdentifier)
 
 	sort.SliceStable(processedChunks, func(i, j int) bool {
 		return processedChunks[i].StartByte < processedChunks[j].StartByte
@@ -88,7 +85,7 @@ func (gc *GenericCompressor) Compress(content []byte, languageIdentifier string)
 
 // compressHTML is a specialized function to compress HTML content
 // since Tree-sitter doesn't handle HTML well with the JavaScript parser
-func (gc *GenericCompressor) compressHTML(content []byte) (string, error) {
+func (gc *GenericCompressor) compressHTML(content []byte) string {
 	// Convert content to string for easier processing
 	htmlStr := string(content)
 
@@ -118,7 +115,7 @@ func (gc *GenericCompressor) compressHTML(content []byte) (string, error) {
 	chunks = append(chunks, bodyTags...)
 
 	if len(chunks) == 0 {
-		return "// No relevant HTML elements found after compression.\n", nil
+		return "// No relevant HTML elements found after compression.\n"
 	}
 
 	var result strings.Builder
@@ -127,10 +124,10 @@ func (gc *GenericCompressor) compressHTML(content []byte) (string, error) {
 		result.WriteString("\n// -----\n")
 	}
 
-	return result.String(), nil
+	return result.String()
 }
 
-func (gc *GenericCompressor) processCaptures(matches []*sitter.QueryMatch, query *sitter.Query, source []byte, languageIdentifier string) ([]CodeChunk, error) {
+func (gc *GenericCompressor) processCaptures(matches []*sitter.QueryMatch, query *sitter.Query, source []byte, languageIdentifier string) []CodeChunk {
 	var chunks []CodeChunk
 	seenNodes := make(map[uint32]struct{}) // Tracks nodes already processed to avoid duplicates
 
@@ -254,7 +251,6 @@ func (gc *GenericCompressor) processCaptures(matches []*sitter.QueryMatch, query
 								case "function_declaration", "class_declaration", "generator_function_declaration", "arrow_function", "function_expression":
 									// These are types that can be default exported and might have bodies to strip.
 									directChildDecl = child
-									break
 								default:
 									// Not a type we are looking for as a direct declaration in `export default ...`
 								}
@@ -386,11 +382,11 @@ func (gc *GenericCompressor) processCaptures(matches []*sitter.QueryMatch, query
 			}
 		}
 	}
-	return chunks, nil
+	return chunks
 }
 
 // compressSwift is a specialized function to compress Swift content
-func (gc *GenericCompressor) compressSwift(content []byte) (string, error) {
+func (gc *GenericCompressor) compressSwift(content []byte) string {
 	// Convert content to string for easier processing
 	swiftStr := string(content)
 
@@ -442,7 +438,7 @@ func (gc *GenericCompressor) compressSwift(content []byte) (string, error) {
 	chunks = append(chunks, extensions...)
 
 	if len(chunks) == 0 {
-		return "// No relevant Swift elements found after compression.\n", nil
+		return "// No relevant Swift elements found after compression.\n"
 	}
 
 	var result strings.Builder
@@ -451,11 +447,11 @@ func (gc *GenericCompressor) compressSwift(content []byte) (string, error) {
 		result.WriteString("\n// -----\n")
 	}
 
-	return result.String(), nil
+	return result.String()
 }
 
 // compressJava is a specialized function to compress Java content
-func (gc *GenericCompressor) compressJava(content []byte) (string, error) {
+func (gc *GenericCompressor) compressJava(content []byte) string {
 	// Convert content to string for easier processing
 	javaStr := string(content)
 
@@ -502,7 +498,7 @@ func (gc *GenericCompressor) compressJava(content []byte) (string, error) {
 	chunks = append(chunks, methods...)
 
 	if len(chunks) == 0 {
-		return "// No relevant Java elements found after compression.\n", nil
+		return "// No relevant Java elements found after compression.\n"
 	}
 
 	var result strings.Builder
@@ -511,11 +507,11 @@ func (gc *GenericCompressor) compressJava(content []byte) (string, error) {
 		result.WriteString("\n// -----\n")
 	}
 
-	return result.String(), nil
+	return result.String()
 }
 
 // compressRust is a specialized function to compress Rust content
-func (gc *GenericCompressor) compressRust(content []byte) (string, error) {
+func (gc *GenericCompressor) compressRust(content []byte) string {
 	// Convert content to string for easier processing
 	rustStr := string(content)
 
@@ -562,7 +558,7 @@ func (gc *GenericCompressor) compressRust(content []byte) (string, error) {
 	chunks = append(chunks, impls...)
 
 	if len(chunks) == 0 {
-		return "// No relevant Rust elements found after compression.\n", nil
+		return "// No relevant Rust elements found after compression.\n"
 	}
 
 	var result strings.Builder
@@ -571,5 +567,5 @@ func (gc *GenericCompressor) compressRust(content []byte) (string, error) {
 		result.WriteString("\n// -----\n")
 	}
 
-	return result.String(), nil
+	return result.String()
 }
