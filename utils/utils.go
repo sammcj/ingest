@@ -35,18 +35,29 @@ func CopyToClipboard(rendered string) error {
 }
 
 func writeToWindowsClipboard(text string) error {
-	// Copy using powershell for utf-8 encoding
+	// Copy using PowerShell for UTF-8 encoding
 	psCmd := `[Console]::InputEncoding = [System.Text.Encoding]::UTF8; $s = [Console]::In.ReadToEnd(); Set-Clipboard -Value $s`
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-Command", psCmd)
 	stdin, err := cmd.StdinPipe()
-	if err == nil {
-		if err := cmd.Start(); err == nil {
-			_, _ = stdin.Write([]byte(text))
-			_ = stdin.Close()
-			if err := cmd.Wait(); err == nil {
-				return nil
-			}
-		}
+	if err != nil {
+		return fmt.Errorf("failed to create stdin pipe for PowerShell: %w", err)
+	}
+	defer stdin.Close()
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start PowerShell: %w", err)
+	}
+
+	if _, err := stdin.Write([]byte(text)); err != nil {
+		return fmt.Errorf("failed to write to PowerShell stdin: %w", err)
+	}
+
+	if err := stdin.Close(); err != nil {
+		return fmt.Errorf("failed to close PowerShell stdin: %w", err)
+	}
+
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("PowerShell failed to set clipboard: %w", err)
 	}
 
 	return nil
