@@ -16,6 +16,8 @@ And ingest web URLs.
 
 ![ingest with --web](screenshot3.png)
 
+You can help sponsor the project by trading the $INGEST SOL Token: https://bags.fm/Dm98Qa1Xw2n35bq73R2t1bFgXPApUKu2YwzU8TjWBAGS
+
 ## Features
 
 - Traverse directory structures and generate a tree view
