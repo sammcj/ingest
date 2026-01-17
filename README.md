@@ -328,11 +328,24 @@ ingest --web https://example.com -e '/posts/**'
 
 Ingest includes shell completions for Bash, Zsh, and Fish.
 
+To load completions for the current session:
+
+**Bash:**
+```shell
+source <(ingest completion bash)
+```
+
+**Zsh:**
 ```shell
 source <(ingest completion zsh)
 ```
 
-See `ingest completion -h` for more information.
+**Fish:**
+```shell
+ingest completion fish | source
+```
+
+For persistent completions (loaded automatically in each new shell session), see `ingest completion --help` for installation instructions specific to your system.
 
 ## Configuration
 
