@@ -144,9 +144,33 @@ func init() {
 
 	// Add completion command
 	rootCmd.AddCommand(&cobra.Command{
-		Use:                   "completion [bash|zsh|fish]",
-		Short:                 "Generate completion script",
-		Long:                  `To load completions: Bash: $ source <(ingest completion bash) Zsh: $ source <(ingest completion zsh) Fish: $ ingest completion`,
+		Use:   "completion [bash|zsh|fish]",
+		Short: "Generate completion script",
+		Long: `Generate shell completion script for the specified shell.
+
+To load completions:
+
+Bash:
+  $ source <(ingest completion bash)
+
+  To load completions for each session, execute once:
+  Linux:
+    $ ingest completion bash > /etc/bash_completion.d/ingest
+  macOS:
+    $ ingest completion bash > $(brew --prefix)/etc/bash_completion.d/ingest
+
+Zsh:
+  $ source <(ingest completion zsh)
+
+  To load completions for each session, execute once:
+  $ ingest completion zsh > "${fpath[1]}/_ingest"
+
+Fish:
+  $ ingest completion fish | source
+
+  To load completions for each session, execute once:
+  $ ingest completion fish > ~/.config/fish/completions/ingest.fish
+`,
 		DisableFlagsInUseLine: true,
 		ValidArgs:             []string{"bash", "zsh", "fish"},
 		Args:                  cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
