@@ -417,6 +417,8 @@ To override the default templates, create a `default.tmpl` file in `~/.config/in
 
 Contributions are welcome, Please feel free to submit a Pull Request.
 
+You can help sponsor the project by trading the $INGEST SOL Token: https://bags.fm/Dm98Qa1Xw2n35bq73R2t1bFgXPApUKu2YwzU8TjWBAGS
+
 ## License
 
 - Copyright 2024 Sam McLeod
