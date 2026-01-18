@@ -322,7 +322,12 @@ func run(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return fmt.Errorf("failed to process directory %s: %w", arg, err)
 			}
-			tree = fmt.Sprintf("%s:\n%s", absPath, tree)
+			// Use relative path for tree header when relativePaths flag is set
+			treePath := absPath
+			if relativePaths {
+				treePath = filepath.Base(absPath)
+			}
+			tree = fmt.Sprintf("%s:\n%s", treePath, tree)
 		} else {
 			// New file processing logic
 			file, err := filesystem.ProcessSingleFile(absPath, lineNumber, relativePaths, noCodeblock, followSymlinks, comp) // Pass compressor
@@ -330,7 +335,12 @@ func run(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("failed to process file %s: %w", arg, err)
 			}
 			files = []filesystem.FileInfo{file}
-			tree = fmt.Sprintf("File: %s", absPath)
+			// Use relative path for file header when relativePaths flag is set
+			filePath := absPath
+			if relativePaths {
+				filePath = filepath.Base(absPath)
+			}
+			tree = fmt.Sprintf("File: %s", filePath)
 		}
 
 		allFiles = append(allFiles, files...)
