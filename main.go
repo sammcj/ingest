@@ -23,7 +23,6 @@ import (
 	"github.com/sammcj/ingest/token"
 	"github.com/sammcj/ingest/utils"
 	"github.com/sammcj/ingest/web"
-	"github.com/sammcj/quantest"
 	openai "github.com/sashabaranov/go-openai"
 	"github.com/spf13/cobra"
 )
@@ -46,17 +45,9 @@ var (
 	patternExclude       string
 	printDefaultExcludes bool
 	printDefaultTemplate bool
-	promptPrefix         string
 	promptSuffix         string
 	report               bool
-	vramFlag             bool
-	modelIDFlag          string
-	quantFlag            string
-	contextFlag          int
-	kvCacheFlag          string
-	memoryFlag           float64
-	fitsFlag             float64
-	quantTypeFlag        string
+	modelFlag            string
 	verbose              bool
 	noDefaultExcludes    bool
 	followSymlinks       bool
@@ -109,7 +100,7 @@ func init() {
 	rootCmd.Flags().StringVar(&gitDiffBranch, "git-diff-branch", "", "Generate git diff between two branches")
 	rootCmd.Flags().StringVar(&gitLogBranch, "git-log-branch", "", "Retrieve git log between two branches")
 	rootCmd.Flags().StringVar(&patternExclude, "pattern-exclude", "", "Path to a specific .glob file for exclude patterns")
-	rootCmd.Flags().StringVarP(&encoding, "encoding", "c", "o200k", "Tokeniser to use for token count (o200k, cl100k, p50k, r50k)")
+	rootCmd.Flags().StringVarP(&encoding, "encoding", "c", "o200k", "Offline tokeniser vocabulary (o200k, cl100k)")
 	rootCmd.Flags().StringVarP(&output, "output", "o", "", "Optional output file path")
 	rootCmd.Flags().StringArrayP("prompt", "p", nil, "Prompt suffix to append to the generated content")
 	rootCmd.Flags().StringVarP(&templatePath, "template", "t", "", "Optional Path to a custom Handlebars template")
@@ -120,6 +111,7 @@ func init() {
 	rootCmd.Flags().BoolVar(&compressFlag, "compress", false, "Enable code compression using Tree-sitter") // Added compress flag
 	rootCmd.Flags().BoolVarP(&anthropicFlag, "anthropic", "a", false, "Use Anthropic API for token counting (requires ANTHROPIC_API_KEY, ANTHROPIC_TOKEN, or ANTHROPIC_TOKEN_COUNT_KEY)")
 	rootCmd.Flags().BoolVar(&noCorrectionFlag, "no-correction", false, "Disable offline tokeniser correction factor (use raw token count)")
+	rootCmd.Flags().StringVarP(&modelFlag, "model", "m", token.DefaultModel, "Model to count tokens for (sets the offline correction factor and the Anthropic API model)")
 
 	// Web Crawler flags
 	rootCmd.Flags().BoolVar(&webCrawl, "web", false, "Enable web crawling mode")
@@ -127,20 +119,6 @@ func init() {
 	rootCmd.Flags().StringSliceVar(&webAllowedDomains, "web-domains", nil, "Allowed domains for web crawling")
 	rootCmd.Flags().IntVar(&webTimeout, "web-timeout", 120, "Timeout in seconds for web requests")
 	rootCmd.Flags().IntVar(&webConcurrentJobs, "web-concurrent", 6, "Number of concurrent crawling jobs")
-
-	// VRAM estimation flags
-	rootCmd.Flags().BoolVar(&vramFlag, "vram", false, "Estimate vRAM usage")
-	rootCmd.Flags().StringVarP(&modelIDFlag, "model", "m", "", "vRAM Estimation - Model ID")
-	rootCmd.Flags().StringVarP(&quantFlag, "quant", "q", "", "vRAM Estimation - Quantization type (e.g., q4_k_m) or bits per weight (e.g., 5.0)")
-	rootCmd.Flags().IntVar(&contextFlag, "context", 0, "vRAM Estimation - Context length for vRAM estimation")
-	rootCmd.Flags().StringVar(&kvCacheFlag, "kvcache", "fp16", "vRAM Estimation - KV cache quantization: fp16, q8_0, or q4_0")
-	rootCmd.Flags().StringVar(&quantTypeFlag, "quanttype", "gguf", "vRAM Estimation - Quantization type: gguf or exl2")
-	rootCmd.Flags().Float64Var(&memoryFlag, "memory", 0, "vRAM Estimation - Available memory in GB for context calculation")
-	// if --fits is set, set memory to it's value
-	rootCmd.Flags().Float64VarP(&fitsFlag, "fits", "f", 0, "(alias for --memory)")
-	if err := rootCmd.Flags().SetAnnotation("fits", cobra.BashCompOneRequiredFlag, []string{"--memory"}); err != nil {
-		fmt.Printf("Error setting annotation for fits flag: %v\n", err)
-	}
 
 	// Add completion command
 	rootCmd.AddCommand(&cobra.Command{
@@ -422,18 +400,11 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// VRAM estimation
-	if vramFlag {
-		fmt.Println()
-		if err := performVRAMEstimation(rendered); err != nil {
-			utils.PrintColouredMessage("❌", fmt.Sprintf("VRAM estimation error: %v", err), color.FgRed)
-		}
-	}
 	useLLM, _ := cmd.Flags().GetBool("llm")
 
 	// Handle output
 	if useLLM {
-		if err := handleLLMOutput(rendered, cfg.LLM, tokens, encoding); err != nil {
+		if err := handleLLMOutput(rendered, cfg.LLM, tokens); err != nil {
 			utils.PrintColouredMessage("❌", fmt.Sprintf("LLM output error: %v", err), color.FgRed)
 		}
 	} else {
@@ -443,7 +414,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if (cfg.AutoSave || autoSave) && output != "" {
 			outputForHandleOutput = ""
 		}
-		if err := handleOutput(rendered, tokens, encoding, noClipboard, outputForHandleOutput, jsonOutput, report || verbose, allFiles); err != nil {
+		if err := handleOutput(rendered, tokens, noClipboard, outputForHandleOutput, jsonOutput, report || verbose, allFiles); err != nil {
 			return fmt.Errorf("failed to handle output: %w", err)
 		}
 	}
@@ -488,7 +459,7 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 	}
 
 	// Count tokens in batch (uses parallel API calls if Anthropic API is enabled)
-	tokenCounts := token.CountTokensBatch(fileContents, encoding, anthropicFlag, noCorrectionFlag)
+	tokenCounts := token.CountTokensBatch(fileContents, tokenOptions())
 
 	// Print the files with their token counts
 	for i := range displayCount {
@@ -499,9 +470,19 @@ func reportLargestFiles(files []filesystem.FileInfo) {
 	fmt.Println()
 }
 
-func handleOutput(rendered string, countTokens bool, encoding string, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
+// tokenOptions builds the token counting options from the command line flags.
+func tokenOptions() token.Options {
+	return token.Options{
+		Encoding:     encoding,
+		Model:        modelFlag,
+		UseAPI:       anthropicFlag,
+		NoCorrection: noCorrectionFlag,
+	}
+}
+
+func handleOutput(rendered string, countTokens bool, noClipboard bool, output string, jsonOutput bool, report bool, files []filesystem.FileInfo) error {
 	if countTokens {
-		tokenCount := token.CountTokens(rendered, encoding, anthropicFlag, noCorrectionFlag)
+		tokenCount := token.CountTokens(rendered, tokenOptions())
 		println()
 		utils.AddMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow, 1)
 	}
@@ -513,8 +494,8 @@ func handleOutput(rendered string, countTokens bool, encoding string, noClipboar
 	if jsonOutput {
 		jsonData := map[string]any{
 			"prompt":      rendered,
-			"token_count": token.CountTokens(rendered, encoding, anthropicFlag, noCorrectionFlag),
-			"model_info":  token.GetModelInfo(encoding),
+			"token_count": token.CountTokens(rendered, tokenOptions()),
+			"model_info":  token.Describe(tokenOptions()),
 		}
 		jsonBytes, err := json.MarshalIndent(jsonData, "", "  ")
 		if err != nil {
@@ -607,22 +588,31 @@ func printExcludePatterns(patterns []string) {
 	}
 }
 
-func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool, encoding string) error {
+func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bool) error {
 	if countTokens {
-		tokenCount := token.CountTokens(rendered, encoding, anthropicFlag, noCorrectionFlag)
+		tokenCount := token.CountTokens(rendered, tokenOptions())
 		utils.AddMessage("ℹ️", fmt.Sprintf("Tokens (Approximate): %v", utils.FormatNumber(tokenCount)), color.FgYellow, 40)
 	}
 
-	if promptPrefix != "" {
-		rendered = promptPrefix + "\n" + rendered
+	if llmConfig.PromptPrefix != "" {
+		rendered = llmConfig.PromptPrefix + "\n" + rendered
 	}
 
-	if promptSuffix != "" {
-		rendered += "\n" + promptSuffix
+	// The --prompt flag takes precedence over the configured suffix.
+	suffix := promptSuffix
+	if suffix == "" {
+		suffix = llmConfig.PromptSuffix
+	}
+	if suffix != "" {
+		rendered += "\n" + suffix
 	}
 
 	if llmConfig.AuthToken == "" {
 		return fmt.Errorf("LLM auth token is empty")
+	}
+
+	if llmConfig.Model == "" {
+		return fmt.Errorf("no LLM model configured, set llm_model in ~/.config/ingest/ingest.json")
 	}
 
 	clientConfig := openai.DefaultConfig(llmConfig.AuthToken)
@@ -731,58 +721,6 @@ func handleLLMOutput(rendered string, llmConfig config.LLMConfig, countTokens bo
 			return fmt.Errorf("rendering error: %w", err)
 		}
 		fmt.Print(renderedContent)
-	}
-
-	return nil
-}
-
-func performVRAMEstimation(content string) error {
-	if modelIDFlag == "" {
-		return fmt.Errorf("model ID is required for vRAM estimation")
-	}
-
-	tokenCount := token.CountTokens(content, encoding, anthropicFlag, noCorrectionFlag)
-
-	// TODO: fix this:
-	// quant, err := quantest.GetOllamaQuantLevel(modelIDFlag)
-	// if err != nil {
-	// 	return fmt.Errorf("error getting quantisation level: %w", err)
-	// }
-
-	quant := "q4_k_m"
-
-	estimation, err := quantest.EstimateVRAMForModel(modelIDFlag, memoryFlag, tokenCount, quant, kvCacheFlag)
-	if err != nil {
-		return fmt.Errorf("error estimating vRAM: %w", err)
-	}
-
-	utils.AddMessage("ℹ️", fmt.Sprintf("Model: %s", estimation.ModelName), color.FgCyan, 10)
-	utils.AddMessage("ℹ️", fmt.Sprintf("Estimated vRAM Required: %.2f GB", estimation.EstimatedVRAM), color.FgCyan, 3)
-	// print the vram available
-	utils.AddMessage("ℹ️", fmt.Sprintf("Available vRAM: %.2f GB", memoryFlag), color.FgCyan, 10)
-	if estimation.FitsAvailable {
-		utils.AddMessage("✅", "Fits Available vRAM", color.FgGreen, 2)
-	} else {
-		utils.AddMessage("❌", "Does Not Fit Available vRAM", color.FgYellow, 2)
-	}
-	utils.AddMessage("ℹ️", fmt.Sprintf("Max Context Size: %d", estimation.MaxContextSize), color.FgCyan, 8)
-	// utils.AddMessage("ℹ️", fmt.Sprintf("Maximum Quantisation: %s", estimation.MaximumQuant), color.FgCyan, 10)
-	// TODO: - this isn't that useful, come up with something smarter
-
-	// Generate and print the quant table
-	table, err := quantest.GenerateQuantTable(estimation.ModelConfig, memoryFlag)
-	if err != nil {
-		return fmt.Errorf("error generating quant table: %w", err)
-	}
-	fmt.Println(quantest.PrintFormattedTable(table))
-
-	// Check if the content fits within the specified constraints
-	if memoryFlag > 0 {
-		if tokenCount > estimation.MaxContextSize {
-			utils.AddMessage("❗️", fmt.Sprintf("Generated content (%d tokens) exceeds maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgYellow, 2)
-		} else {
-			utils.AddMessage("✅", fmt.Sprintf("Generated content (%d tokens) fits within maximum context (%d tokens).", tokenCount, estimation.MaxContextSize), color.FgGreen, 2)
-		}
 	}
 
 	return nil

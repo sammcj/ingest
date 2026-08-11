@@ -8,7 +8,7 @@ Ingest parses directories of plain text files, such as source code, into a singl
 
 ![ingest](screenshot2.png)
 
-Ingest can also pass the prompt directly to an LLM such as Ollama for processing.
+Ingest can also pass the prompt directly to any OpenAI compatible API for processing.
 
 ![ingest with --llm](screenshot.png)
 
@@ -21,10 +21,9 @@ And ingest web URLs.
 - Traverse directory structures and generate a tree view
 - Include/exclude files based on glob patterns
 - Compress code using Tree-sitter to extract key structural information while omitting implementation details
-- Estimate vRAM requirements and check model compatibility using another package I've created called [quantest](https://github.com/sammcj/quantest)
-- Parse output directly to LLMs such as Ollama or any OpenAI compatible API for processing
+- Parse output directly to any OpenAI compatible API for processing
 - Generate and include git diffs and logs
-- Count tokens using offline tokeniser (default) or optionally use Anthropic API (API key required, but no charge for counting)
+- Count tokens using a bundled offline tokeniser (default) or optionally use the Anthropic API (API key required, but no charge for counting)
 - Customisable output templates
 - Copy output to clipboard (when available)
 - Export to file or print to console
@@ -79,7 +78,17 @@ $ ingest
 [✅] Copied to clipboard successfully.
 ```
 
-The first time ingest runs, it will download a small [tokeniser](https://github.com/pkoukk/tiktoken-go-loader/blob/main/assets/cl100k_base.tiktoken) called 'cl100k_base.tiktoken' this is used for tokenisation.
+### Token counting
+
+The tokeniser vocabularies (o200k_base and cl100k_base) are compiled into the binary, so ingest works offline and never downloads or caches anything.
+
+Anthropic has never published a Claude tokeniser, so offline counts are produced with o200k_base and scaled to the model given by `--model` (default `claude-opus-5`):
+
+- Claude Opus 4.7 and later, including Opus 5, Sonnet 5 and Fable 5, use a tokeniser that produces roughly 30% more tokens for the same text than earlier Claude models. These are scaled by 1.53.
+- Earlier Claude models are scaled by 1.18.
+- Non-Claude models are counted with their own vocabulary, so no scaling is applied.
+
+Both factors are approximations that vary with content. For an exact count use `-a/--anthropic`, which calls Anthropic's `count_tokens` endpoint with the same `--model` (free, but needs `ANTHROPIC_API_KEY`). `--no-correction` reports the raw o200k_base count.
 
 Generate a prompt from a directory, including only Python files:
 
@@ -117,78 +126,16 @@ Save output to to ~/ingest/<directory_name>.md:
 ingest --save /path/to/project
 ```
 
-### VRAM Estimation and Model Compatibility
-
-Ingest includes a feature to estimate VRAM requirements and check model compatibility using the [Gollama](https://github.com/sammcj/gollama)'s vramestimator package. This helps you determine if your generated content will fit within the specified model, VRAM, and quantisation constraints.
-
-To use this feature, add the following flags to your ingest command:
+Count tokens for a specific model, or exactly via the Anthropic API:
 
 ```shell
-ingest --vram --model <model_id> [--memory <memory_in_gb>] [--quant <quantisation>] [--context <context_length>] [--kvcache <kv_cache_quant>] [--quanttype <quant_type>] [other flags] <paths>
+ingest --model claude-fable-5 /path/to/project
+ingest --anthropic /path/to/project
 ```
-
-Examples:
-
-Estimate VRAM usage for a specific context:
-
-```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant q4_k_m --context 2048 --kvcache q4_0 .
-# Estimated VRAM usage: 5.35 GB
-```
-
-Calculate maximum context for a given memory constraint:
-
-```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant q4_k_m --memory 6 --kvcache q8_0 .
-# Maximum context for 6.00 GB of memory: 5069
-```
-
-Find the best BPW (Bits Per Weight):
-
-```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 6 --quanttype gguf .
-# Best BPW for 6.00 GB of memory: IQ3_S
-```
-
-The tool also works for exl2 (ExllamaV2) models:
-
-```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant 5.0 --context 2048 --kvcache q4_0 . # For exl2 models
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --quant 5.0 --memory 6 --kvcache q8_0 . # For exl2 models
-```
-
-When using the VRAM estimation feature along with content generation, ingest will provide information about the generated content's compatibility with the specified constraints:
-
-```shell
-ingest --vram --model NousResearch/Hermes-2-Theta-Llama-3-8B --memory 8 --quant q4_0 .
-⠋ Traversing directory and building tree... [0s]
-[ℹ️] 14,702 Tokens (Approximate)
-[ℹ️] Maximum context for 8.00 GB of memory: 10240
-[✅] Generated content (14,702 tokens) fits within maximum context.
-Top 15 largest files (by estimated token count):
-1. /Users/samm/git/sammcj/ingest/main.go (4,682 tokens)
-2. /Users/samm/git/sammcj/ingest/filesystem/filesystem.go (2,694 tokens)
-3. /Users/samm/git/sammcj/ingest/README.md (1,895 tokens)
-4. /Users/samm/git/sammcj/ingest/utils/utils.go (948 tokens)
-5. /Users/samm/git/sammcj/ingest/config/config.go (884 tokens)
-[✅] Copied to clipboard successfully.
-```
-
-Available flags for VRAM estimation:
-
-- `--vram`: Enable VRAM estimation and model compatibility check
-- `--model`: Specify the model ID to check against (required for estimation)
-- `--memory`: Specify the available memory in GB for context calculation (optional)
-- `--quant`: Specify the quantisation type (e.g., q4_k_m) or bits per weight (e.g., 5.0)
-- `--context`: Specify the context length for VRAM estimation (optional)
-- `--kvcache`: Specify the KV cache quantisation (fp16, q8_0, or q4_0)
-- `--quanttype`: Specify the quantisation type (gguf or exl2)
-
-Ingest will provide appropriate output based on the combination of flags used, such as estimating VRAM usage, calculating maximum context, or finding the best BPW. If the generated content fits within the specified constraints, you'll see a success message. Otherwise, you'll receive a warning that the content may not fit.
 
 ## LLM Integration
 
-Ingest can pass the generated prompt to LLMs that have an OpenAI compatible API such as [Ollama](https://ollama.com) for processing.
+Ingest can pass the generated prompt to any OpenAI compatible API for processing.
 
 ```shell
 ingest --llm /path/to/project
@@ -351,11 +298,10 @@ For persistent completions (loaded automatically in each new shell session), see
 
 Ingest uses a configuration file located at `~/.config/ingest/ingest.json`.
 
-You can make Ollama processing run without prompting setting `"llm_auto_run": true` in the config file.
+The config file contains:
 
-The config file also contains:
-
-- `llm_model`: The model to use for processing the prompt, e.g. "llama3.1:8b-q5_k_m".
+- `llm_model`: The model to use for processing the prompt with `--llm`. Required if you use `--llm`.
+- `llm_base_url`: The OpenAI compatible endpoint, defaults to `$OPENAI_API_BASE` or `https://api.openai.com/v1`.
 - `llm_prompt_prefix`: An optional prefix to prepend to the prompt, e.g. "This is my application."
 - `llm_prompt_suffix`: An optional suffix to append to the prompt, e.g. "explain this code"
 
@@ -372,29 +318,24 @@ These directories will be created automatically on first run, along with README 
 - `--compress`: Enable code compression using Tree-sitter to extract key structural information while omitting implementation details
 - `--config`: Opens the config file in the default editor
 - `--no-correction`: Disable offline tokeniser correction factor (use raw token count)
-- `--context`: Specify the context length for VRAM estimation
+- `-c, --encoding`: Offline tokeniser vocabulary (o200k, cl100k)
+- `-m, --model`: Model to count tokens for, defaults to claude-opus-5
 - `--exclude-from-tree`: Exclude files/folders from the source tree based on exclude patterns
 - `--git-diff-branch`: Generate git diff between two branches
 - `--git-log-branch`: Retrieve git log between two branches
 - `--include-priority`: Include files in case of conflict between include and exclude patterns
 - `--json`: Print output as JSON
-- `--kvcache`: Specify the KV cache quantisation
-- `--llm`: Send the generated prompt to an OpenAI compatible LLM server (such as Ollama) for processing
-- `--memory`: Specify the available memory in GB for context calculation
-- `--model`: Specify the model ID for VRAM estimation
+- `--llm`: Send the generated prompt to an OpenAI compatible LLM server for processing
 - `--no-codeblock`: Disable wrapping code inside markdown code blocks
 - `--no-default-excludes`: Disable default exclude patterns
 - `--pattern-exclude`: Path to a specific .glob file for exclude patterns
 - `--print-default-excludes`: Print the default exclude patterns
 - `--print-default-template`: Print the default template
-- `--quant`: Specify the quantisation type or bits per weight
-- `--quanttype`: Specify the quantisation type (gguf or exl2)
 - `--relative-paths`: Use relative paths instead of absolute paths
 - `--report`: Print the largest parsed files
 - `--save`: Save output to ~/ingest/<directory_name>.md
 - `--tokens`: Display the token count of the generated prompt
 - `--verbose`: Print verbose output
-- `--vram`: Estimate VRAM usage and check model compatibility
 - `--web-concurrent`: Maximum concurrent requests for web crawling
 - `--web-depth`: Maximum depth for web crawling
 - `--web-domains`: Comma-separated list of domains to restrict web crawling
