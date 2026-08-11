@@ -25,8 +25,9 @@ type AnthropicTokenCountResponse struct {
 	InputTokens int `json:"input_tokens"`
 }
 
-// AnthropicModel is the Claude model used for token counting
-const AnthropicModel = "claude-sonnet-4-5"
+// DefaultModel is the Claude model token counts are produced for. It sets both
+// the model sent to count_tokens and the offline correction factor.
+const DefaultModel = "claude-opus-5"
 
 // httpClient is a reusable HTTP client with connection pooling and timeout
 var httpClient = &http.Client{
@@ -47,14 +48,18 @@ func getAnthropicAPIKey() (string, error) {
 	return "", fmt.Errorf("no Anthropic API key found in environment variables (checked ANTHROPIC_API_KEY, ANTHROPIC_TOKEN, ANTHROPIC_TOKEN_COUNT_KEY)")
 }
 
-func CountTokensAPI(content string) (int, error) {
+func CountTokensAPI(content string, model string) (int, error) {
 	apiKey, err := getAnthropicAPIKey()
 	if err != nil {
 		return 0, err
 	}
 
+	if model == "" {
+		model = DefaultModel
+	}
+
 	requestBody := AnthropicTokenCountRequest{
-		Model: AnthropicModel,
+		Model: model,
 		Messages: []Message{
 			{
 				Role:    "user",
@@ -98,7 +103,7 @@ func CountTokensAPI(content string) (int, error) {
 
 // CountTokensBatchAPI counts tokens for multiple content strings in parallel batches.
 // Processes up to batchSize items concurrently to avoid overwhelming the API.
-func CountTokensBatchAPI(contents []string, batchSize int) ([]int, error) {
+func CountTokensBatchAPI(contents []string, model string, batchSize int) ([]int, error) {
 	if len(contents) == 0 {
 		return []int{}, nil
 	}
@@ -116,7 +121,7 @@ func CountTokensBatchAPI(contents []string, batchSize int) ([]int, error) {
 			wg.Add(1)
 			go func(index int, content string) {
 				defer wg.Done()
-				count, err := CountTokensAPI(content)
+				count, err := CountTokensAPI(content, model)
 				if err != nil {
 					errors[index] = err
 					results[index] = 0

@@ -10,17 +10,9 @@ import (
 	"github.com/mitchellh/go-homedir"
 )
 
-type OllamaConfig struct {
-	Model        string `json:"llm_model"`
-	PromptPrefix string `json:"llm_prompt_prefix"`
-	PromptSuffix string `json:"llm_prompt_suffix"`
-	AutoRun      bool   `json:"llm_auto_run"`
-}
-
 type Config struct {
-	Ollama   []OllamaConfig `json:"ollama"`
-	LLM      LLMConfig      `json:"llm"`
-	AutoSave bool           `json:"auto_save"`
+	LLM      LLMConfig `json:"llm"`
+	AutoSave bool      `json:"auto_save"`
 }
 
 type LLMConfig struct {
@@ -33,6 +25,8 @@ type LLMConfig struct {
 	PresencePenalty  *float32 `json:"llm_presence_penalty,omitempty"`
 	FrequencyPenalty *float32 `json:"llm_frequency_penalty,omitempty"`
 	APIType          string   `json:"llm_api_type"`
+	PromptPrefix     string   `json:"llm_prompt_prefix"`
+	PromptSuffix     string   `json:"llm_prompt_suffix"`
 }
 
 // loads the config file
@@ -64,9 +58,6 @@ func LoadConfig() (*Config, error) {
 	if config.LLM.BaseURL == "" {
 		config.LLM.BaseURL = getDefaultBaseURL()
 	}
-	if config.LLM.Model == "" {
-		config.LLM.Model = "llama3.1:8b-instruct-q6_K"
-	}
 	if config.LLM.MaxTokens == 0 {
 		config.LLM.MaxTokens = 2048
 	}
@@ -79,18 +70,10 @@ func LoadConfig() (*Config, error) {
 
 func createDefaultConfig(configPath string) (*Config, error) {
 	defaultConfig := Config{
-		Ollama: []OllamaConfig{
-			{
-				Model:        "llama3.1:8b-instruct-q6_K",
-				PromptPrefix: "Code: ",
-				PromptSuffix: "",
-				AutoRun:      false,
-			},
-		},
 		LLM: LLMConfig{
 			BaseURL:   getDefaultBaseURL(),
-			Model:     "llama3.1:8b-instruct-q6_K",
 			MaxTokens: 2048,
+			APIType:   "OPEN_AI",
 		},
 		AutoSave: false,
 	}
@@ -117,10 +100,7 @@ func getDefaultBaseURL() string {
 	if url := os.Getenv("OPENAI_API_BASE"); url != "" {
 		return url
 	}
-	if url := os.Getenv("llm_HOST"); url != "" {
-		return url + "/v1"
-	}
-	return "http://localhost:11434/v1"
+	return "https://api.openai.com/v1"
 }
 
 // opens the config file in the default editor

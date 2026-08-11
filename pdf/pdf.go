@@ -48,7 +48,7 @@ func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 	defer f.Close()
 
 	var buf strings.Builder
-	buf.WriteString(fmt.Sprintf("# PDF Content: %s\n\n", filepath.Base(path)))
+	fmt.Fprintf(&buf, "# PDF Content: %s\n\n", filepath.Base(path))
 
 	// Extract text from each page
 	totalPages := r.NumPage()
@@ -66,7 +66,7 @@ func ConvertPDFToMarkdown(path string, isURL bool) (string, error) {
 		// Clean and process the text
 		cleanedText := cleanText(text)
 		if cleanedText != "" {
-			buf.WriteString(fmt.Sprintf("## Page %d\n\n", pageNum))
+			fmt.Fprintf(&buf, "## Page %d\n\n", pageNum)
 			buf.WriteString(cleanedText)
 			buf.WriteString("\n\n")
 		}

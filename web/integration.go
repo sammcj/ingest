@@ -124,7 +124,7 @@ func generateWebTree(pages []*WebPage) string {
 			for _, page := range pages {
 				indent := strings.Repeat("  ", depth)
 				urlPath := getURLPath(page.URL)
-				builder.WriteString(fmt.Sprintf("%s├── %s\n", indent, urlPath))
+				fmt.Fprintf(&builder, "%s├── %s\n", indent, urlPath)
 			}
 		}
 	}
